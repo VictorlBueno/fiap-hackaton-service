@@ -2,24 +2,23 @@ import {Module} from '@nestjs/common';
 import {MulterModule} from '@nestjs/platform-express';
 import {ServeStaticModule} from '@nestjs/serve-static';
 import {join} from 'path';
-import {ProcessVideoUseCase} from "../../application/usecases/process-video.usecase";
-import {VideoController} from "../controllers/video.controller";
-import {QueueVideoUseCase} from "../../application/usecases/queue-video.usecase";
+import {VideoController} from "../adapters/controllers/video.controller";
 import {GetJobStatusUseCase} from "../../application/usecases/get-job-status.usecase";
+import {UploadVideoUseCase} from "../../application/usecases/upload-video.usecase";
+import {VideoProcessingService} from "../../domain/service/video-processing.service";
 import {ListProcessedFilesUseCase} from "../../application/usecases/list-processed.usecase";
-import {FileValidationService} from "../../application/services/file-validation.service";
-import {VideoProcessingRepository} from "../repositories/video-processing.repository";
-import {FfmpegService} from "../services/ffmeg.services";
-import {ZipService} from "../services/zip.services";
-import {VideoQueueProcessorService} from "../services/video-queue-processor.service";
-import {RabbitMQService} from "../services/rabbitmq.service";
-
+import {FfmpegVideoProcessorAdapter} from "../adapters/gateways/ffmpeg-video-processor.adapter";
+import {RabbitMQQueueAdapter} from "../adapters/gateways/rabbitmq-queue.adapter";
+import {FilesystemStorageAdapter} from "../adapters/gateways/filesystem-storage.adapter";
+import {FileJobRepositoryAdapter} from "../adapters/repositories/file-job-repository.adapter";
+import {QueueProcessorAdapter} from "../adapters/processors/queue-processor.adapter";
 
 @Module({
     imports: [
         MulterModule.register({
             dest: './uploads',
         }),
+
         ServeStaticModule.forRoot({
             rootPath: join(__dirname, '..', 'uploads'),
             serveRoot: '/uploads',
@@ -29,23 +28,43 @@ import {RabbitMQService} from "../services/rabbitmq.service";
             serveRoot: '/outputs',
         }),
     ],
-    controllers: [VideoController],
+
+    controllers: [
+        VideoController,
+    ],
+
     providers: [
-        ProcessVideoUseCase,
-        QueueVideoUseCase,
+        UploadVideoUseCase,
         GetJobStatusUseCase,
         ListProcessedFilesUseCase,
-        FileValidationService,
+        VideoProcessingService,
         {
-            provide: 'IVideoProcessingRepository',
-            useClass: VideoProcessingRepository,
+            provide: 'VideoProcessorPort',
+            useClass: FfmpegVideoProcessorAdapter,
         },
-        FfmpegService,
-        ZipService,
-        RabbitMQService,
-        VideoQueueProcessorService,
+        {
+            provide: 'QueuePort',
+            useClass: RabbitMQQueueAdapter,
+        },
+        {
+            provide: 'FileStoragePort',
+            useClass: FilesystemStorageAdapter,
+        },
+        {
+            provide: 'JobRepositoryPort',
+            useClass: FileJobRepositoryAdapter,
+        },
+
+        FfmpegVideoProcessorAdapter,
+        RabbitMQQueueAdapter,
+        FilesystemStorageAdapter,
+        FileJobRepositoryAdapter,
+        QueueProcessorAdapter,
     ],
 })
 
 export class AppModule {
+    constructor() {
+        console.log('🏗️ AppModule inicializado com Arquitetura Hexagonal');
+    }
 }

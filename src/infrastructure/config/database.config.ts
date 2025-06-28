@@ -17,30 +17,14 @@ export const initDatabase = async (): Promise<void> => {
     const pool = createDatabasePool();
 
     const createTable = `
-        CREATE TABLE IF NOT EXISTS processing_results
-        (
-            id
-            SERIAL
-            PRIMARY
-            KEY,
-            success
-            BOOLEAN
-            NOT
-            NULL,
-            message
-            TEXT
-            NOT
-            NULL,
-            zip_path
-            VARCHAR
-        (
-            255
-        ),
+        CREATE TABLE IF NOT EXISTS processing_results (
+                                                          id SERIAL PRIMARY KEY,
+                                                          success BOOLEAN NOT NULL,
+                                                          message TEXT NOT NULL,
+                                                          zip_path VARCHAR(255),
             frame_count INTEGER,
             images JSONB,
-            created_at TIMESTAMP DEFAULT NOW
-        (
-        )
+            created_at TIMESTAMP DEFAULT NOW()
             );
     `;
 

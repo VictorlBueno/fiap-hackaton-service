@@ -1,15 +1,14 @@
-import {Inject, Injectable} from '@nestjs/common';
-import {IVideoProcessingRepository} from "../../domain/repositories/video-processing.repository";
+import { Injectable, Inject } from '@nestjs/common';
+import { ProcessedFile } from '../../domain/entities/processed-file.entity';
+import { JobRepositoryPort } from '../../domain/ports/repositories/job-repository.port';
 
 @Injectable()
 export class ListProcessedFilesUseCase {
     constructor(
-        @Inject('IVideoProcessingRepository')
-        private readonly videoRepository: IVideoProcessingRepository,
-    ) {
-    }
+        @Inject('JobRepositoryPort') private readonly jobRepository: JobRepositoryPort,
+    ) {}
 
-    async execute(): Promise<any[]> {
-        return this.videoRepository.getProcessedFiles();
+    async execute(): Promise<ProcessedFile[]> {
+        return this.jobRepository.getProcessedFiles();
     }
 }
