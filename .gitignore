@@ -2,9 +2,9 @@
 /dist
 /node_modules
 /build
-outputs
+outputs/
 temp
-uploads
+uploads/
 
 # Logs
 logs
