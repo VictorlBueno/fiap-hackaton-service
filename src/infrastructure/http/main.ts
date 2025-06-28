@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import * as fs from 'fs';
 import {AppModule} from "../modules/app.module";
 import {initDatabase} from "../config/database.config";
+import {DocumentBuilder, SwaggerModule} from "@nestjs/swagger";
 
 async function bootstrap() {
     // Criar diretórios necessários
@@ -22,6 +23,16 @@ async function bootstrap() {
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
         allowedHeaders: 'Content-Type, Accept',
     });
+
+    const config = new DocumentBuilder()
+        .setTitle('Video Processor API - Hexagonal Architecture')
+        .setDescription('API para processamento de vídeos com Arquitetura Hexagonal + RabbitMQ')
+        .setVersion('1.0')
+        .addTag('Video Processing', 'Endpoints para processamento de vídeos')
+        .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api-docs', app, document);
 
     await app.listen(8080);
 

@@ -4,12 +4,13 @@ export class Video {
         public readonly originalName: string,
         public readonly path: string,
         public readonly size: number,
+        public readonly userId: string,
         public readonly createdAt: Date = new Date()
     ) {}
 
-    static create(originalName: string, path: string, size: number): Video {
+    static create(originalName: string, path: string, size: number, userId: string): Video {
         const id = new Date().toISOString().replace(/[:.]/g, '-');
-        return new Video(id, originalName, path, size);
+        return new Video(id, originalName, path, size, userId);
     }
 
     isValidFormat(): boolean {
