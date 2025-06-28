@@ -1,11 +1,10 @@
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
-import {AppModule} from "../modules/app.module";
 import {initDatabase} from "../config/database.config";
-import {DocumentBuilder, SwaggerModule} from "@nestjs/swagger";
+import {AppModule} from "../modules/app.module";
 
 async function bootstrap() {
-    // Criar diretórios necessários
     const dirs = ['uploads', 'outputs', 'temp'];
     dirs.forEach(dir => {
         if (!fs.existsSync(dir)) {
@@ -16,28 +15,53 @@ async function bootstrap() {
     // Inicializar banco de dados
     await initDatabase();
 
+    console.log('🚀 Iniciando aplicação com Arquitetura Hexagonal...');
     const app = await NestFactory.create(AppModule);
 
-    app.enableCors({
-        origin: '*',
-        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-        allowedHeaders: 'Content-Type, Accept',
-    });
-
+    // Configuração do Swagger com JWT
     const config = new DocumentBuilder()
         .setTitle('Video Processor API - Hexagonal Architecture')
         .setDescription('API para processamento de vídeos com Arquitetura Hexagonal + RabbitMQ')
         .setVersion('1.0')
         .addTag('Video Processing', 'Endpoints para processamento de vídeos')
+        .addBearerAuth(
+            {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+                name: 'JWT',
+                description: 'Enter JWT token',
+                in: 'header',
+            },
+            'JWT-auth',
+        )
         .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api-docs', app, document);
+    SwaggerModule.setup('api-docs', app, document, {
+        customSiteTitle: 'Video Processor API',
+        customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css',
+        customJs: [
+            'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.js',
+        ],
+        swaggerOptions: {
+            persistAuthorization: true, // Mantém o token após refresh
+            displayRequestDuration: true,
+            docExpansion: 'list',
+            filter: true,
+            showRequestHeaders: true,
+            tryItOutEnabled: true,
+        },
+    });
+
+    app.enableCors({
+        origin: '*',
+        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+        allowedHeaders: 'Content-Type, Accept, Authorization',
+    });
 
     await app.listen(8080);
-
-    console.log('🎬 Servidor iniciado na porta 8080');
-    console.log('📂 Acesse: http://localhost:8080');
 }
 
 bootstrap();

@@ -11,7 +11,7 @@ import {
     UseInterceptors
 } from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
-import {ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiTags} from '@nestjs/swagger';
+import {ApiBearerAuth, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiTags} from '@nestjs/swagger';
 import {Response} from 'express';
 import {diskStorage} from 'multer';
 import {ProcessingJob} from '../../../domain/entities/processing-job.entity';
@@ -24,6 +24,7 @@ import {ListProcessedFilesUseCase} from "../../../application/usecases/list-proc
 import {AuthenticatedRequest} from "../../middleware/jwt-auth.middleware";
 
 @ApiTags('Video Processing')
+@ApiBearerAuth('JWT-auth')
 @Controller()
 export class VideoController {
     constructor(
@@ -72,9 +73,24 @@ export class VideoController {
     }
 
     @Get('api/job/:jobId')
-    @ApiOperation({summary: 'Verificar status do job'})
-    @ApiParam({name: 'jobId', description: 'ID do job'})
-    @ApiResponse({status: 200, description: 'Status do job', type: ProcessingJob})
+    @ApiOperation({
+        summary: 'Verificar status do job',
+        description: 'Retorna apenas jobs que pertencem ao usuário autenticado'
+    })
+    @ApiParam({
+        name: 'jobId',
+        description: 'ID do job de processamento',
+        example: '2025-06-28T16-43-36-099Z'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Status do job retornado com sucesso',
+        type: ProcessingJob
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Job não encontrado ou não pertence ao usuário'
+    })
     async getJobStatus(
         @Param('jobId') jobId: string,
         @Req() req: AuthenticatedRequest
@@ -90,12 +106,39 @@ export class VideoController {
     }
 
     @Get('download/:filename')
-    @ApiOperation({summary: 'Download do arquivo processado'})
-    @ApiParam({name: 'filename', description: 'Nome do arquivo'})
+    @ApiOperation({
+        summary: 'Download do arquivo processado',
+        description: 'Permite download apenas de arquivos que pertencem ao usuário autenticado'
+    })
+    @ApiParam({
+        name: 'filename',
+        description: 'Nome do arquivo ZIP',
+        example: 'frames_2025-06-28T16-43-36-099Z.zip'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Arquivo enviado com sucesso',
+        content: {
+            'application/zip': {
+                schema: {
+                    type: 'string',
+                    format: 'binary'
+                }
+            }
+        }
+    })
+    @ApiResponse({
+        status: 403,
+        description: 'Arquivo não pertence ao usuário'
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Arquivo não encontrado'
+    })
     async downloadFile(
         @Param('filename') filename: string,
         @Res() res: Response,
-        @Req() req: AuthenticatedRequest // <- Usar interface personalizada
+        @Req() req: AuthenticatedRequest
     ) {
         const userId = req.userId || 'anonymous-user';
 
@@ -122,7 +165,33 @@ export class VideoController {
     }
 
     @Get('api/status')
-    @ApiOperation({summary: 'Listar arquivos processados do usuário'})
+    @ApiOperation({
+        summary: 'Listar arquivos processados do usuário',
+        description: 'Retorna apenas arquivos que pertencem ao usuário autenticado'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Lista de arquivos do usuário',
+        schema: {
+            type: 'object',
+            properties: {
+                files: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            filename: {type: 'string', example: 'frames_2025-06-28T16-43-36-099Z.zip'},
+                            size: {type: 'number', example: 1048576},
+                            created_at: {type: 'string', example: '2025-06-28 16:43:36'},
+                            download_url: {type: 'string', example: '/download/frames_2025-06-28T16-43-36-099Z.zip'}
+                        }
+                    }
+                },
+                total: {type: 'number', example: 3},
+                userId: {type: 'string', example: 'user-123'}
+            }
+        }
+    })
     async getStatus(@Req() req: AuthenticatedRequest) {
         try {
             const userId = req.userId || 'anonymous-user';

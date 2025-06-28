@@ -93,4 +93,12 @@ export class ProcessingJob {
             userId
         );
     }
+
+    isCompleted(): boolean {
+        return this.status === JobStatus.COMPLETED;
+    }
+
+    isFailed(): boolean {
+        return this.status === JobStatus.FAILED;
+    }
 }
