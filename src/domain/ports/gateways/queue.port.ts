@@ -2,6 +2,7 @@ export interface QueueMessage {
     id: string;
     videoPath: string;
     videoName: string;
+    userId: string;
 }
 
 export interface QueuePort {

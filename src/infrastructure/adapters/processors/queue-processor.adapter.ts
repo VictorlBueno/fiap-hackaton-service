@@ -1,6 +1,6 @@
-import { Injectable, OnModuleInit, Inject } from '@nestjs/common';
-import { QueuePort, QueueMessage } from '../../../domain/ports/gateways/queue.port';
-import { Video } from '../../../domain/entities/video.entity';
+import {Inject, Injectable, OnModuleInit} from '@nestjs/common';
+import {Video} from '../../../domain/entities/video.entity';
+import {QueueMessage, QueuePort} from "../../../domain/ports/gateways/queue.port";
 import {VideoProcessingService} from "../../../domain/service/video-processing.service";
 
 @Injectable()
@@ -8,7 +8,8 @@ export class QueueProcessorAdapter implements OnModuleInit {
     constructor(
         @Inject('QueuePort') private readonly queue: QueuePort,
         private readonly videoProcessingService: VideoProcessingService,
-    ) {}
+    ) {
+    }
 
     async onModuleInit() {
         console.log('🎯 Iniciando processador de fila...');
@@ -29,9 +30,29 @@ export class QueueProcessorAdapter implements OnModuleInit {
     }
 
     private async processMessage(message: QueueMessage): Promise<void> {
-        console.log(`🎬 Processando vídeo: ${message.videoName}`);
+        console.log(`🎬 Processando vídeo do usuário ${message.userId}: ${message.videoName} (ID: ${message.id})`);
 
-        const video = new Video(message.id, message.videoName, message.videoPath, 0);
-        await this.videoProcessingService.processVideo(video);
+        try {
+            const video = new Video(
+                message.id,
+                message.videoName,
+                message.videoPath,
+                0,
+                message.userId,
+                new Date()
+            );
+
+            const result = await this.videoProcessingService.processVideo(video);
+
+            if (result.isCompleted()) {
+                console.log(`✅ Processamento concluído para usuário ${message.userId}: ${message.id}`);
+            } else if (result.isFailed()) {
+                console.error(`❌ Processamento falhou para usuário ${message.userId}: ${message.id} - ${result.message}`);
+            }
+
+        } catch (error) {
+            console.error(`❌ Erro crítico no processamento para usuário ${message.userId}: ${message.id}`, error.message);
+            throw error;
+        }
     }
 }

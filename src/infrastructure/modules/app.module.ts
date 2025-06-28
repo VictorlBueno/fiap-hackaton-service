@@ -1,4 +1,4 @@
-import {Module} from '@nestjs/common';
+import {MiddlewareConsumer, Module, RequestMethod} from '@nestjs/common';
 import {MulterModule} from '@nestjs/platform-express';
 import {ServeStaticModule} from '@nestjs/serve-static';
 import {join} from 'path';
@@ -12,6 +12,7 @@ import {RabbitMQQueueAdapter} from "../adapters/gateways/rabbitmq-queue.adapter"
 import {FilesystemStorageAdapter} from "../adapters/gateways/filesystem-storage.adapter";
 import {FileJobRepositoryAdapter} from "../adapters/repositories/file-job-repository.adapter";
 import {QueueProcessorAdapter} from "../adapters/processors/queue-processor.adapter";
+import {JwtAuthMiddleware} from "../middleware/jwt-auth.middleware";
 
 @Module({
     imports: [
@@ -64,7 +65,14 @@ import {QueueProcessorAdapter} from "../adapters/processors/queue-processor.adap
 })
 
 export class AppModule {
-    constructor() {
-        console.log('🏗️ AppModule inicializado com Arquitetura Hexagonal');
+    configure(consumer: MiddlewareConsumer) {
+        consumer
+            .apply(JwtAuthMiddleware)
+            .forRoutes(
+                {path: 'upload', method: RequestMethod.POST},
+                {path: 'api/job/*', method: RequestMethod.GET},
+                {path: 'api/status', method: RequestMethod.GET},
+                {path: 'download/*', method: RequestMethod.GET},
+            );
     }
 }

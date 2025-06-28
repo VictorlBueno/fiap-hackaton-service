@@ -8,7 +8,7 @@ export class GetJobStatusUseCase {
         @Inject('JobRepositoryPort') private readonly jobRepository: JobRepositoryPort,
     ) {}
 
-    async execute(jobId: string): Promise<ProcessingJob | null> {
-        return this.jobRepository.findJobById(jobId);
+    async execute(jobId: string, userId: string): Promise<ProcessingJob | null> {
+        return this.jobRepository.findJobById(jobId, userId);
     }
 }
