@@ -2,13 +2,17 @@ import {Module} from '@nestjs/common';
 import {MulterModule} from '@nestjs/platform-express';
 import {ServeStaticModule} from '@nestjs/serve-static';
 import {join} from 'path';
-import {VideoProcessingRepository} from "../repositories/video-processing.repository";
-import {ListProcessedFilesUseCase} from "../../application/usecases/list-processed.usecase";
 import {ProcessVideoUseCase} from "../../application/usecases/process-video.usecase";
 import {VideoController} from "../controllers/video.controller";
+import {QueueVideoUseCase} from "../../application/usecases/queue-video.usecase";
+import {GetJobStatusUseCase} from "../../application/usecases/get-job-status.usecase";
+import {ListProcessedFilesUseCase} from "../../application/usecases/list-processed.usecase";
 import {FileValidationService} from "../../application/services/file-validation.service";
+import {VideoProcessingRepository} from "../repositories/video-processing.repository";
 import {FfmpegService} from "../services/ffmeg.services";
 import {ZipService} from "../services/zip.services";
+import {VideoQueueProcessorService} from "../services/video-queue-processor.service";
+import {RabbitMQService} from "../services/rabbitmq.service";
 
 
 @Module({
@@ -28,6 +32,8 @@ import {ZipService} from "../services/zip.services";
     controllers: [VideoController],
     providers: [
         ProcessVideoUseCase,
+        QueueVideoUseCase,
+        GetJobStatusUseCase,
         ListProcessedFilesUseCase,
         FileValidationService,
         {
@@ -36,6 +42,8 @@ import {ZipService} from "../services/zip.services";
         },
         FfmpegService,
         ZipService,
+        RabbitMQService,
+        VideoQueueProcessorService,
     ],
 })
 

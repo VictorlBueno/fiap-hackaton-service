@@ -4,17 +4,20 @@ import {ApiConsumes, ApiOperation, ApiParam, ApiProduces, ApiResponse, ApiTags} 
 import {Response} from 'express';
 import {diskStorage} from 'multer';
 import {FileValidationService} from '../../application/services/file-validation.service';
-import {ProcessingResult} from '../../domain/entities/processing-result.entity';
+import {QueueResponse} from '../../domain/entities/queue-response.entity';
+import {ProcessingJob} from '../../domain/entities/processing-status.entity';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import {ProcessVideoUseCase} from "../../application/usecases/process-video.usecase";
+import {QueueVideoUseCase} from "../../application/usecases/queue-video.usecase";
+import {GetJobStatusUseCase} from "../../application/usecases/get-job-status.usecase";
 import {ListProcessedFilesUseCase} from "../../application/usecases/list-processed.usecase";
 
 @ApiTags('Video Processing')
 @Controller()
 export class VideoController {
     constructor(
-        private readonly processVideoUseCase: ProcessVideoUseCase,
+        private readonly queueVideoUseCase: QueueVideoUseCase,
+        private readonly getJobStatusUseCase: GetJobStatusUseCase,
         private readonly listProcessedFilesUseCase: ListProcessedFilesUseCase,
         private readonly fileValidationService: FileValidationService,
     ) {
@@ -29,12 +32,12 @@ export class VideoController {
     }
 
     @Post('upload')
-    @ApiOperation({summary: 'Upload e processamento de vídeo'})
+    @ApiOperation({summary: 'Upload de vídeo e adição à fila de processamento'})
     @ApiConsumes('multipart/form-data')
     @ApiResponse({
         status: 200,
-        description: 'Vídeo processado com sucesso',
-        type: ProcessingResult
+        description: 'Vídeo adicionado à fila com sucesso',
+        type: QueueResponse
     })
     @ApiResponse({
         status: 400,
@@ -49,29 +52,53 @@ export class VideoController {
             },
         }),
     }))
-    async uploadVideo(@UploadedFile() file: Express.Multer.File): Promise<ProcessingResult> {
-        if (!file) {
-            return new ProcessingResult(false, 'Erro ao receber arquivo');
-        }
-
-        if (!this.fileValidationService.isValidVideoFile(file.originalname)) {
-            await fs.unlink(file.path);
-            return new ProcessingResult(false, 'Formato de arquivo não suportado. Use: mp4, avi, mov, mkv');
-        }
-
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-
+    async uploadVideo(@UploadedFile() file: Express.Multer.File): Promise<QueueResponse> {
         try {
-            const result = await this.processVideoUseCase.execute(file.path, timestamp);
-
-            if (result.success) {
-                await fs.unlink(file.path);
+            if (!file) {
+                return new QueueResponse(false, 'Erro ao receber arquivo', '', '');
             }
+
+            if (!this.fileValidationService.isValidVideoFile(file.originalname)) {
+                await fs.unlink(file.path);
+                return new QueueResponse(false, 'Formato de arquivo não suportado. Use: mp4, avi, mov, mkv', '', '');
+            }
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+            console.log(`📤 Adicionando vídeo à fila: ${file.originalname}`);
+            const result = await this.queueVideoUseCase.execute(file.path, file.originalname, timestamp);
 
             return result;
         } catch (error) {
-            return new ProcessingResult(false, error.message);
+            console.error('Erro no upload:', error);
+            return new QueueResponse(false, `Erro interno: ${error.message || 'Erro desconhecido'}`, '', '');
         }
+    }
+
+    @Get('api/job/:jobId')
+    @ApiOperation({summary: 'Verificar status do job de processamento'})
+    @ApiParam({
+        name: 'jobId',
+        description: 'ID do job de processamento',
+        example: '2025-06-28T16-43-36-099Z'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Status do job retornado com sucesso',
+        type: ProcessingJob
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Job não encontrado'
+    })
+    async getJobStatus(@Param('jobId') jobId: string) {
+        const job = await this.getJobStatusUseCase.execute(jobId);
+
+        if (!job) {
+            return {error: 'Job não encontrado'};
+        }
+
+        return job;
     }
 
     @Get('download/:filename')
@@ -208,6 +235,7 @@ export class VideoController {
         }
         .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
         .loading { 
             text-align: center; 
             display: none;
@@ -246,6 +274,16 @@ export class VideoController {
             font-weight: bold;
         }
         .swagger-link:hover { background: #138496; }
+        .status-btn {
+            background: #ffc107;
+            color: #212529;
+            padding: 5px 15px;
+            text-decoration: none;
+            border-radius: 3px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .status-btn:hover { background: #e0a800; }
     </style>
 </head>
 <body>
@@ -254,18 +292,19 @@ export class VideoController {
     <div class="container">
         <h1>🎬 FIAP X - Processador de Vídeos</h1>
         <p style="text-align: center; color: #666;">
-            Faça upload de um vídeo e receba um ZIP com todos os frames extraídos!
+            Faça upload de um vídeo e receba um ZIP com todos os frames extraídos!<br>
+            <strong>Agora com processamento em fila!</strong>
         </p>
         
         <form id="uploadForm" class="upload-form">
             <p><strong>Selecione um arquivo de vídeo:</strong></p>
             <input type="file" id="videoFile" accept="video/*" required>
             <br>
-            <button type="submit">🚀 Processar Vídeo</button>
+            <button type="submit">🚀 Adicionar à Fila</button>
         </form>
         
         <div class="loading" id="loading">
-            <p>⏳ Processando vídeo... Isso pode levar alguns minutos.</p>
+            <p>⏳ Enviando vídeo para fila de processamento...</p>
         </div>
         
         <div class="result" id="result"></div>
@@ -277,6 +316,9 @@ export class VideoController {
     </div>
 
     <script>
+        let currentJobId = null;
+        let statusInterval = null;
+
         document.getElementById('uploadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -300,28 +342,69 @@ export class VideoController {
                     body: formData
                 });
                 
+                if (!response.ok) {
+                    throw new Error(\`HTTP error! status: \${response.status}\`);
+                }
+                
                 const result = await response.json();
-                console.log('Response:', result); // Debug log
+                console.log('Response:', result);
                 
                 if (result && result.success) {
-                    const zipPath = result.zipPath || 'arquivo.zip';
+                    currentJobId = result.jobId;
                     showResult(
                         result.message + 
-                        '<br><br><a href="/download/' + zipPath + '" class="download-btn">⬇️ Download ZIP</a>',
-                        'success'
+                        '<br><br><div id="jobStatus">Verificando status...</div>',
+                        'info'
                     );
-                    loadFilesList();
+                    
+                    // Inicia monitoramento do status
+                    startStatusMonitoring(result.jobId);
+                    
+                    // Reset form
+                    fileInput.value = '';
                 } else {
                     const errorMessage = result && result.message ? result.message : 'Erro desconhecido';
                     showResult('Erro: ' + errorMessage, 'error');
                 }
             } catch (error) {
-                console.error('Error:', error); // Debug log
+                console.error('Error:', error);
                 showResult('Erro de conexão: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
         });
+
+        async function startStatusMonitoring(jobId) {
+            if (statusInterval) {
+                clearInterval(statusInterval);
+            }
+
+            statusInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(\`/api/job/\${jobId}\`);
+                    const status = await response.json();
+                    
+                    const statusDiv = document.getElementById('jobStatus');
+                    if (statusDiv && status) {
+                        if (status.status === 'completed') {
+                            const zipFilename = \`frames_\${jobId}.zip\`;
+                            statusDiv.innerHTML = 
+                                \`✅ \${status.message}<br><br>\` +
+                                \`<a href="/download/\${zipFilename}" class="download-btn">⬇️ Download ZIP</a>\`;
+                            clearInterval(statusInterval);
+                            loadFilesList();
+                        } else if (status.status === 'failed') {
+                            statusDiv.innerHTML = \`❌ \${status.message}\`;
+                            clearInterval(statusInterval);
+                        } else {
+                            statusDiv.innerHTML = \`⏳ \${status.message}\`;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking status:', error);
+                }
+            }, 3000); // Verifica a cada 3 segundos
+        }
         
         function showResult(message, type) {
             const result = document.getElementById('result');
@@ -332,6 +415,9 @@ export class VideoController {
         
         function hideResult() {
             document.getElementById('result').style.display = 'none';
+            if (statusInterval) {
+                clearInterval(statusInterval);
+            }
         }
         
         function showLoading(show) {
