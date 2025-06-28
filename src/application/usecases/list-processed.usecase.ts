@@ -8,7 +8,7 @@ export class ListProcessedFilesUseCase {
         @Inject('JobRepositoryPort') private readonly jobRepository: JobRepositoryPort,
     ) {}
 
-    async execute(): Promise<ProcessedFile[]> {
-        return this.jobRepository.getProcessedFiles();
+    async execute(userId: string): Promise<ProcessedFile[]> {
+        return this.jobRepository.getProcessedFilesByUser(userId);
     }
 }

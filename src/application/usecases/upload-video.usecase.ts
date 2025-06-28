@@ -14,12 +14,12 @@ export class UploadVideoUseCase {
         @Inject('FileStoragePort') private readonly fileStorage: FileStoragePort,
     ) {}
 
-    async execute(file: Express.Multer.File): Promise<UploadResponse> {
+    async execute(file: Express.Multer.File, userId: string): Promise<UploadResponse> {
         if (!file) {
             return { success: false, message: 'Nenhum arquivo recebido' };
         }
 
-        const video = Video.create(file.originalname, file.path, file.size);
+        const video = Video.create(file.originalname, file.path, file.size, userId);
 
         if (!video.isValidFormat()) {
             await this.fileStorage.deleteFile(file.path);
@@ -29,13 +29,14 @@ export class UploadVideoUseCase {
             };
         }
 
-        const job = ProcessingJob.createPending(video.id, video.originalName);
+        const job = ProcessingJob.createPending(video.id, video.originalName, userId);
         await this.jobRepository.saveJob(job);
 
         const message: QueueMessage = {
             id: video.id,
             videoPath: video.path,
             videoName: video.originalName,
+            userId: userId, // <- Incluir userId na mensagem
         };
 
         const queued = await this.queue.sendMessage(message);
