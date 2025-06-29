@@ -12,7 +12,7 @@ export class QueueProcessorAdapter implements OnModuleInit {
     }
 
     async onModuleInit() {
-        console.log('🎯 Iniciando processador de fila...');
+        console.log('Iniciando processador de fila...');
 
         setTimeout(async () => {
             await this.startProcessing();
@@ -22,15 +22,15 @@ export class QueueProcessorAdapter implements OnModuleInit {
     private async startProcessing() {
         try {
             await this.queue.consumeMessages(this.processMessage.bind(this));
-            console.log('✅ Processador de fila iniciado');
+            console.log('Processador de fila iniciado');
         } catch (error) {
-            console.error('❌ Erro no processador:', error.message);
+            console.error('Erro no processador:', error.message);
             setTimeout(() => this.startProcessing(), 5000);
         }
     }
 
     private async processMessage(message: QueueMessage): Promise<void> {
-        console.log(`🎬 Processando vídeo do usuário ${message.userId}: ${message.videoName} (ID: ${message.id})`);
+        console.log(`Processando vídeo do usuário ${message.userId}: ${message.videoName} (ID: ${message.id})`);
 
         try {
             const video = new Video(
@@ -45,13 +45,13 @@ export class QueueProcessorAdapter implements OnModuleInit {
             const result = await this.videoProcessingService.processVideo(video);
 
             if (result?.isCompleted()) {
-                console.log(`✅ Processamento concluído para usuário ${message.userId}: ${message.id}`);
+                console.log(`Processamento concluído para usuário ${message.userId}: ${message.id}`);
             } else if (result?.isFailed()) {
-                console.error(`❌ Processamento falhou para usuário ${message.userId}: ${message.id} - ${result.message}`);
+                console.error(`Processamento falhou para usuário ${message.userId}: ${message.id} - ${result.message}`);
             }
 
         } catch (error) {
-            console.error(`❌ Erro crítico no processamento para usuário ${message.userId}: ${message.id}`, error.message);
+            console.error(`Erro crítico no processamento para usuário ${message.userId}: ${message.id}`, error.message);
             throw error;
         }
     }

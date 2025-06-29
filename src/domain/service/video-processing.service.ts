@@ -62,7 +62,7 @@ export class VideoProcessingService {
 
       const zipFilename = `${video.id}.zip`;
       const zipPath = `outputs/${zipFilename}`;
-      console.log(`📦 Criando ZIP: ${zipPath}`);
+      console.log(`Criando ZIP: ${zipPath}`);
 
       await this.fileStorage.createZip(frames, zipPath);
 
@@ -97,7 +97,7 @@ export class VideoProcessingService {
       return await this.jobRepository.findJobById(video.id, video.userId);
     } catch (error) {
       console.error(
-        `❌ Erro no processamento para usuário ${video.userId}:`,
+        `Erro no processamento para usuário ${video.userId}:`,
         error.message,
       );
 
