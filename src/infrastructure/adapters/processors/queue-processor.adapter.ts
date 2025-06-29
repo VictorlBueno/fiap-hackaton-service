@@ -44,9 +44,9 @@ export class QueueProcessorAdapter implements OnModuleInit {
 
             const result = await this.videoProcessingService.processVideo(video);
 
-            if (result.isCompleted()) {
+            if (result?.isCompleted()) {
                 console.log(`✅ Processamento concluído para usuário ${message.userId}: ${message.id}`);
-            } else if (result.isFailed()) {
+            } else if (result?.isFailed()) {
                 console.error(`❌ Processamento falhou para usuário ${message.userId}: ${message.id} - ${result.message}`);
             }
 
