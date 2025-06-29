@@ -35,22 +35,22 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
       job.id,
       job.userId,
       job.videoName,
-      null, // video_path será atualizado durante processamento
+      null,
       job.status,
       job.message,
       job.frameCount || null,
       job.zipPath || null,
-      job.zipPath || null, // zip_filename igual ao zipPath por enquanto
+      job.zipPath || null,
       job.createdAt,
     ];
 
     try {
       await this.pool.query(query, values);
       console.log(
-        `💾 Job salvo no PostgreSQL: ${job.id} - ${job.status} (usuário: ${job.userId})`,
+        `Job salvo no PostgreSQL: ${job.id} - ${job.status} (usuário: ${job.userId})`,
       );
     } catch (error) {
-      console.error('❌ Erro ao salvar job no PostgreSQL:', error.message);
+      console.error('Erro ao salvar job no PostgreSQL:', error.message);
       throw error;
     }
   }
@@ -82,7 +82,7 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
         row.created_at,
       );
     } catch (error) {
-      console.error('❌ Erro ao buscar job no PostgreSQL:', error.message);
+      console.error('Erro ao buscar job no PostgreSQL:', error.message);
       return null;
     }
   }
@@ -132,11 +132,11 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
       }
 
       console.log(
-        `📋 Listados ${files.length} arquivos do PostgreSQL para usuário ${userId}`,
+        `Listados ${files.length} arquivos do PostgreSQL para usuário ${userId}`,
       );
       return files;
     } catch (error) {
-      console.error('❌ Erro ao listar arquivos do PostgreSQL:', error.message);
+      console.error('Erro ao listar arquivos do PostgreSQL:', error.message);
       return [];
     }
   }
@@ -163,12 +163,9 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
 
     try {
       await this.pool.query(query, values);
-      console.log(`🔄 Status atualizado no PostgreSQL: ${id} -> ${status}`);
+      console.log(`Status atualizado no PostgreSQL: ${id} -> ${status}`);
     } catch (error) {
-      console.error(
-        '❌ Erro ao atualizar status no PostgreSQL:',
-        error.message,
-      );
+      console.error('Erro ao atualizar status no PostgreSQL:', error.message);
       throw error;
     }
   }
@@ -178,9 +175,9 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
 
     try {
       await this.pool.query(query, [videoPath, id]);
-      console.log(`📁 Caminho do vídeo atualizado: ${id} -> ${videoPath}`);
+      console.log(`Caminho do vídeo atualizado: ${id} -> ${videoPath}`);
     } catch (error) {
-      console.error('❌ Erro ao atualizar caminho do vídeo:', error.message);
+      console.error('Erro ao atualizar caminho do vídeo:', error.message);
     }
   }
 
@@ -211,12 +208,12 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
       );
 
       console.log(
-        `📋 Retornados ${jobs.length} jobs do PostgreSQL para usuário ${userId}`,
+        `Retornados ${jobs.length} jobs do PostgreSQL para usuário ${userId}`,
       );
       return jobs;
     } catch (error) {
       console.error(
-        '❌ Erro ao buscar todos os jobs no PostgreSQL:',
+        'Erro ao buscar todos os jobs no PostgreSQL:',
         error.message,
       );
       return [];

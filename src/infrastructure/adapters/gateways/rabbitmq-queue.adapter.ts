@@ -1,184 +1,187 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as amqp from 'amqplib';
-import {ChannelModel} from "amqplib";
-import {QueueMessage, QueuePort} from "../../../domain/ports/gateways/queue.port";
+import { ChannelModel } from 'amqplib';
+import {
+  QueueMessage,
+  QueuePort,
+} from '../../../domain/ports/gateways/queue.port';
 
 @Injectable()
-export class RabbitMQQueueAdapter implements QueuePort, OnModuleInit, OnModuleDestroy {
-    private connection: ChannelModel | null;
-    private channel: amqp.Channel;
-    private readonly queueName = 'video_processing';
-    private isConnected = false;
-    private reconnectAttempts = 0;
-    private readonly maxReconnectAttempts = 5;
+export class RabbitMQQueueAdapter
+  implements QueuePort, OnModuleInit, OnModuleDestroy
+{
+  private connection: ChannelModel | null;
+  private channel: amqp.Channel;
+  private readonly queueName = 'video_processing';
+  private isConnected = false;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 5;
 
-    async onModuleInit() {
+  async onModuleInit() {
+    await this.connect();
+  }
+
+  async onModuleDestroy() {
+    await this.disconnect();
+  }
+
+  async sendMessage(message: QueueMessage): Promise<boolean> {
+    try {
+      if (!this.isConnected) {
+        console.log('Tentando reconectar antes de enviar...');
         await this.connect();
-    }
 
-    async onModuleDestroy() {
-        await this.disconnect();
-    }
-
-    private async connect(): Promise<void> {
-        try {
-            // URL correta com credenciais admin:admin123
-            const url = process.env.RABBITMQ_URL || 'amqp://admin:admin123@localhost:5672';
-            console.log('🐰 Conectando ao RabbitMQ...');
-            console.log(`🔗 URL: ${url.replace(/\/\/.*@/, '//***:***@')}`); // Log sem mostrar credenciais
-
-            this.connection = await amqp.connect(url);
-            this.channel = await this.connection.createChannel();
-
-            await this.channel.assertQueue(this.queueName, { durable: true });
-            this.isConnected = true;
-            this.reconnectAttempts = 0;
-
-            console.log('✅ RabbitMQ conectado e fila criada');
-
-            // Configurar handlers de erro
-            this.connection.on('error', (error) => {
-                console.error('❌ Erro de conexão RabbitMQ:', error.message);
-                this.isConnected = false;
-                this.scheduleReconnect();
-            });
-
-            this.connection.on('close', () => {
-                console.warn('⚠️ Conexão RabbitMQ fechada');
-                this.isConnected = false;
-                this.scheduleReconnect();
-            });
-
-            this.channel.on('error', (error) => {
-                console.error('❌ Erro no canal RabbitMQ:', error.message);
-                this.isConnected = false;
-                this.scheduleReconnect();
-            });
-
-            this.channel.on('close', () => {
-                console.warn('⚠️ Canal RabbitMQ fechado');
-                this.isConnected = false;
-                this.scheduleReconnect();
-            });
-
-        } catch (error) {
-            console.error('❌ Erro ao conectar RabbitMQ:', error.message);
-            this.isConnected = false;
-            this.scheduleReconnect();
-        }
-    }
-
-    private scheduleReconnect(): void {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error(`❌ Máximo de tentativas de reconexão atingido (${this.maxReconnectAttempts})`);
-            return;
+        if (!this.isConnected) {
+          console.error('Falha na reconexão');
+          return false;
         }
 
-        this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
 
-        console.log(`🔄 Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts} em ${delay}ms...`);
+      if (!this.channel) {
+        console.error('Canal não disponível');
+        return false;
+      }
 
-        setTimeout(async () => {
-            await this.connect();
-        }, delay);
+      const buffer = Buffer.from(JSON.stringify(message));
+      const result = this.channel.sendToQueue(this.queueName, buffer, {
+        persistent: true,
+        deliveryMode: 2,
+      });
+
+      console.log(
+        `Mensagem enviada: ${message.id} (usuário: ${message.userId})`,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao enviar mensagem:', error.message);
+      this.isConnected = false;
+      return false;
     }
+  }
 
-    private async disconnect(): Promise<void> {
-        try {
-            this.isConnected = false;
+  async consumeMessages(
+    callback: (message: QueueMessage) => Promise<void>,
+  ): Promise<void> {
+    try {
+      if (!this.isConnected || !this.channel) {
+        console.error('RabbitMQ não conectado para consumo');
+        return;
+      }
 
-            if (this.channel) {
-                await this.channel.close();
-            }
+      await this.channel.prefetch(1);
 
-            if (this.connection) {
-                await this.connection.close();
-                this.connection = null;
-            }
+      await this.channel.consume(this.queueName, async (msg) => {
+        if (msg) {
+          try {
+            const message: QueueMessage = JSON.parse(msg.content.toString());
+            console.log(
+              `Processando: ${message.id} (usuário: ${message.userId})`,
+            );
 
-            console.log('🐰 RabbitMQ desconectado');
-        } catch (error) {
-            console.error('❌ Erro ao desconectar:', error.message);
+            await callback(message);
+
+            this.channel.ack(msg);
+            console.log(`Concluído: ${message.id}`);
+          } catch (error) {
+            console.error('Erro no processamento:', error.message);
+            const shouldRequeue =
+              !error.message.includes('FFmpeg') &&
+              !error.message.includes('arquivo');
+            this.channel.nack(msg, false, shouldRequeue);
+          }
         }
+      });
+
+      console.log('Consumidor RabbitMQ ativo');
+    } catch (error) {
+      console.error('Erro ao configurar consumidor:', error.message);
+      this.isConnected = false;
+      throw error;
+    }
+  }
+
+  private async connect(): Promise<void> {
+    try {
+      const url = process.env.RABBITMQ_URL!;
+      console.log('Conectando ao RabbitMQ...');
+
+      this.connection = await amqp.connect(url);
+      this.channel = await this.connection.createChannel();
+
+      await this.channel.assertQueue(this.queueName, { durable: true });
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+
+      console.log('RabbitMQ conectado e fila criada');
+
+      this.connection.on('error', (error) => {
+        console.error('Erro de conexão RabbitMQ:', error.message);
+        this.isConnected = false;
+        this.scheduleReconnect();
+      });
+
+      this.connection.on('close', () => {
+        console.warn('Conexão RabbitMQ fechada');
+        this.isConnected = false;
+        this.scheduleReconnect();
+      });
+
+      this.channel.on('error', (error) => {
+        console.error('Erro no canal RabbitMQ:', error.message);
+        this.isConnected = false;
+        this.scheduleReconnect();
+      });
+
+      this.channel.on('close', () => {
+        console.warn('Canal RabbitMQ fechado');
+        this.isConnected = false;
+        this.scheduleReconnect();
+      });
+    } catch (error) {
+      console.error('Erro ao conectar RabbitMQ:', error.message);
+      this.isConnected = false;
+      this.scheduleReconnect();
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error(
+        `Máximo de tentativas de reconexão atingido (${this.maxReconnectAttempts})`,
+      );
+      return;
     }
 
-    async sendMessage(message: QueueMessage): Promise<boolean> {
-        try {
-            if (!this.isConnected) {
-                console.log('🔄 Tentando reconectar antes de enviar...');
-                await this.connect();
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-                if (!this.isConnected) {
-                    console.error('❌ Falha na reconexão');
-                    return false;
-                }
+    console.log(
+      `Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts} em ${delay}ms...`,
+    );
 
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+    setTimeout(async () => {
+      await this.connect();
+    }, delay);
+  }
 
-            if (!this.channel) {
-                console.error('❌ Canal não disponível');
-                return false;
-            }
+  private async disconnect(): Promise<void> {
+    try {
+      this.isConnected = false;
 
-            const buffer = Buffer.from(JSON.stringify(message));
-            const result = this.channel.sendToQueue(this.queueName, buffer, {
-                persistent: true,
-                deliveryMode: 2
-            });
+      if (this.channel) {
+        await this.channel.close();
+      }
 
-            console.log(`📤 Mensagem enviada: ${message.id} (usuário: ${message.userId})`);
-            return result;
+      if (this.connection) {
+        await this.connection.close();
+        this.connection = null;
+      }
 
-        } catch (error) {
-            console.error('❌ Erro ao enviar mensagem:', error.message);
-            this.isConnected = false;
-            return false;
-        }
+      console.log('RabbitMQ desconectado');
+    } catch (error) {
+      console.error('Erro ao desconectar:', error.message);
     }
-
-    async consumeMessages(callback: (message: QueueMessage) => Promise<void>): Promise<void> {
-        try {
-            if (!this.isConnected || !this.channel) {
-                console.error('❌ RabbitMQ não conectado para consumo');
-                return;
-            }
-
-            await this.channel.prefetch(1);
-
-            await this.channel.consume(this.queueName, async (msg) => {
-                if (msg) {
-                    try {
-                        const message: QueueMessage = JSON.parse(msg.content.toString());
-                        console.log(`📥 Processando: ${message.id} (usuário: ${message.userId})`);
-
-                        await callback(message);
-
-                        this.channel.ack(msg);
-                        console.log(`✅ Concluído: ${message.id}`);
-
-                    } catch (error) {
-                        console.error('❌ Erro no processamento:', error.message);
-                        const shouldRequeue = !error.message.includes('FFmpeg') && !error.message.includes('arquivo');
-                        this.channel.nack(msg, false, shouldRequeue);
-                    }
-                }
-            });
-
-            console.log('🎯 Consumidor RabbitMQ ativo');
-
-        } catch (error) {
-            console.error('❌ Erro ao configurar consumidor:', error.message);
-            this.isConnected = false;
-            throw error;
-        }
-    }
-
-    public getConnectionStatus(): { connected: boolean; attempts: number } {
-        return {
-            connected: this.isConnected,
-            attempts: this.reconnectAttempts
-        };
-    }
+  }
 }

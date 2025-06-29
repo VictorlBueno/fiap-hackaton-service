@@ -51,7 +51,7 @@ async function bootstrap() {
       'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.js',
     ],
     swaggerOptions: {
-      persistAuthorization: true, // Mantém o token após refresh
+      persistAuthorization: true,
       displayRequestDuration: true,
       docExpansion: 'list',
       filter: true,
