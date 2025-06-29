@@ -3,6 +3,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import { initDatabase } from '../config/database.config';
 import { AppModule } from '../modules/app.module';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 async function bootstrap() {
   const dirs = ['uploads', 'outputs', 'temp'];
