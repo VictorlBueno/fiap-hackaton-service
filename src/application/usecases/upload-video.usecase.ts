@@ -36,7 +36,7 @@ export class UploadVideoUseCase {
             id: video.id,
             videoPath: video.path,
             videoName: video.originalName,
-            userId: userId, // <- Incluir userId na mensagem
+            userId: userId,
         };
 
         const queued = await this.queue.sendMessage(message);

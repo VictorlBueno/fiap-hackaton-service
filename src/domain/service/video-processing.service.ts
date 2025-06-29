@@ -1,105 +1,113 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Video } from '../entities/video.entity';
-import { ProcessingJob, JobStatus } from '../entities/processing-job.entity';
-import {VideoProcessorPort} from "../ports/gateways/video-processor.port";
-import {FileStoragePort} from "../ports/gateways/file-storage.port";
-import {JobRepositoryPort} from "../ports/repositories/job-repository.port";
+import { JobStatus, ProcessingJob } from '../entities/processing-job.entity';
+import { VideoProcessorPort } from '../ports/gateways/video-processor.port';
+import { FileStoragePort } from '../ports/gateways/file-storage.port';
+import { JobRepositoryPort } from '../ports/repositories/job-repository.port';
 
 @Injectable()
 export class VideoProcessingService {
-    constructor(
-        @Inject('VideoProcessorPort') private readonly videoProcessor: VideoProcessorPort,
-        @Inject('FileStoragePort') private readonly fileStorage: FileStoragePort,
-        @Inject('JobRepositoryPort') private readonly jobRepository: JobRepositoryPort,
-    ) {}
+  constructor(
+    @Inject('VideoProcessorPort')
+    private readonly videoProcessor: VideoProcessorPort,
+    @Inject('FileStoragePort') private readonly fileStorage: FileStoragePort,
+    @Inject('JobRepositoryPort')
+    private readonly jobRepository: JobRepositoryPort,
+  ) {}
 
-    async processVideo(video: Video): Promise<ProcessingJob | null> {
-        console.log(`🎬 Iniciando processamento para usuário ${video.userId}: ${video.originalName}`);
+  async processVideo(video: Video): Promise<ProcessingJob | null> {
+    console.log(
+      `Iniciando processamento para usuário ${video.userId}: ${video.originalName}`,
+    );
 
-        // Atualizar status para processing no banco
+    await this.jobRepository.updateJobStatus(
+      video.id,
+      JobStatus.PROCESSING,
+      'Processando vídeo e extraindo frames...',
+    );
+
+    await this.jobRepository.updateJobVideoPath(video.id, video.path);
+
+    try {
+      const videoExists = await this.fileStorage.fileExists(video.path);
+      if (!videoExists) {
         await this.jobRepository.updateJobStatus(
-            video.id,
-            JobStatus.PROCESSING,
-            'Processando vídeo e extraindo frames...'
+          video.id,
+          JobStatus.FAILED,
+          `Arquivo de vídeo não encontrado: ${video.path}`,
         );
+        throw new Error(`Arquivo de vídeo não encontrado: ${video.path}`);
+      }
 
-        // Atualizar caminho do vídeo no banco
-        await this.jobRepository.updateJobVideoPath(video.id, video.path);
+      const tempDir = `temp/${video.id}`;
+      console.log(`📁 Criando diretório temporário: ${tempDir}`);
 
-        try {
-            const videoExists = await this.fileStorage.fileExists(video.path);
-            if (!videoExists) {
-                await this.jobRepository.updateJobStatus(
-                    video.id,
-                    JobStatus.FAILED,
-                    `Arquivo de vídeo não encontrado: ${video.path}`
-                );
-                throw new Error(`Arquivo de vídeo não encontrado: ${video.path}`);
-            }
+      const frames = await this.videoProcessor.extractFrames(
+        video.path,
+        tempDir,
+      );
 
-            const tempDir = `temp/${video.id}`;
-            console.log(`📁 Criando diretório temporário: ${tempDir}`);
+      if (frames.length === 0) {
+        await this.jobRepository.updateJobStatus(
+          video.id,
+          JobStatus.FAILED,
+          'Nenhum frame extraído do vídeo',
+        );
+        throw new Error('Nenhum frame extraído do vídeo');
+      }
 
-            const frames = await this.videoProcessor.extractFrames(video.path, tempDir);
+      console.log(
+        `Extraídos ${frames.length} frames para usuário ${video.userId}`,
+      );
 
-            if (frames.length === 0) {
-                await this.jobRepository.updateJobStatus(
-                    video.id,
-                    JobStatus.FAILED,
-                    'Nenhum frame extraído do vídeo'
-                );
-                throw new Error('Nenhum frame extraído do vídeo');
-            }
+      const zipFilename = `${video.id}.zip`;
+      const zipPath = `outputs/${zipFilename}`;
+      console.log(`📦 Criando ZIP: ${zipPath}`);
 
-            console.log(`📸 Extraídos ${frames.length} frames para usuário ${video.userId}`);
+      await this.fileStorage.createZip(frames, zipPath);
 
-            const zipFilename = `${video.id}.zip`; // Usar UUID direto
-            const zipPath = `outputs/${zipFilename}`;
-            console.log(`📦 Criando ZIP: ${zipPath}`);
+      const zipExists = await this.fileStorage.fileExists(zipPath);
+      if (!zipExists) {
+        await this.jobRepository.updateJobStatus(
+          video.id,
+          JobStatus.FAILED,
+          'Falha ao criar arquivo ZIP',
+        );
+        throw new Error('Falha ao criar arquivo ZIP');
+      }
 
-            await this.fileStorage.createZip(frames, zipPath);
+      console.log(`ZIP criado com sucesso: ${zipPath}`);
 
-            const zipExists = await this.fileStorage.fileExists(zipPath);
-            if (!zipExists) {
-                await this.jobRepository.updateJobStatus(
-                    video.id,
-                    JobStatus.FAILED,
-                    'Falha ao criar arquivo ZIP'
-                );
-                throw new Error('Falha ao criar arquivo ZIP');
-            }
+      await this.jobRepository.updateJobStatus(
+        video.id,
+        JobStatus.COMPLETED,
+        `Processamento concluído! ${frames.length} frames extraídos.`,
+        {
+          frameCount: frames.length,
+          zipPath: zipFilename,
+        },
+      );
 
-            console.log(`✅ ZIP criado com sucesso: ${zipPath}`);
+      await this.fileStorage.deleteFile(video.path);
 
-            // Atualizar para completed no banco
-            await this.jobRepository.updateJobStatus(
-                video.id,
-                JobStatus.COMPLETED,
-                `Processamento concluído! ${frames.length} frames extraídos.`,
-                {
-                    frameCount: frames.length,
-                    zipPath: zipFilename
-                }
-            );
+      console.log(
+        `Processamento concluído para usuário ${video.userId}: ${video.id}`,
+      );
 
-            // Remover arquivo original
-            await this.fileStorage.deleteFile(video.path);
+      return await this.jobRepository.findJobById(video.id, video.userId);
+    } catch (error) {
+      console.error(
+        `❌ Erro no processamento para usuário ${video.userId}:`,
+        error.message,
+      );
 
-            console.log(`✅ Processamento concluído para usuário ${video.userId}: ${video.id}`);
+      await this.jobRepository.updateJobStatus(
+        video.id,
+        JobStatus.FAILED,
+        error.message,
+      );
 
-            // Retornar job atualizado do banco
-            return await this.jobRepository.findJobById(video.id, video.userId);
-
-        } catch (error) {
-            console.error(`❌ Erro no processamento para usuário ${video.userId}:`, error.message);
-
-            await this.jobRepository.updateJobStatus(
-                video.id,
-                JobStatus.FAILED,
-                error.message
-            );
-
-            throw error;
-        }
+      throw error;
     }
+  }
 }

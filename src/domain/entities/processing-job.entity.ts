@@ -66,7 +66,6 @@ export class ProcessingJob {
     this.updatedAt = updatedAt;
   }
 
-  // Factory methods permanecem iguais...
   static createPending(
     id: string,
     videoName: string,
@@ -134,9 +133,5 @@ export class ProcessingJob {
 
   isFailed(): boolean {
     return this.status === JobStatus.FAILED;
-  }
-
-  canDownload(): boolean {
-    return this.isCompleted() && !!this.zipPath;
   }
 }
