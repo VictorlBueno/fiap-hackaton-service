@@ -116,7 +116,6 @@ export class RabbitMQQueueAdapter
 
       console.log('RabbitMQ conectado e fila criada');
 
-      // Configurar handlers de erro
       this.connection.on('error', (error) => {
         console.error('Erro de conexão RabbitMQ:', error.message);
         this.isConnected = false;
