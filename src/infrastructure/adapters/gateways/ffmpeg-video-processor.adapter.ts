@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { VideoProcessorPort } from '../../../domain/ports/gateways/video-processor.port';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import {VideoProcessorPort} from "../../../domain/ports/gateways/video-processor.port";
 
 const execAsync = promisify(exec);
 
@@ -21,15 +21,29 @@ export class FfmpegVideoProcessorAdapter implements VideoProcessorPort {
             await execAsync(command);
 
             const files = await fs.readdir(outputDir);
-            const frames = files
+            const frameFiles = files
                 .filter(file => file.endsWith('.png'))
                 .map(file => path.join(outputDir, file));
 
-            await fs.rm(outputDir, { recursive: true, force: true });
+            console.log(`✅ ${frameFiles.length} frames extraídos em: ${outputDir}`);
 
-            console.log(`✅ ${frames.length} frames extraídos`);
-            return frames;
+            // Verificar se os arquivos realmente existem
+            for (const frame of frameFiles) {
+                try {
+                    await fs.access(frame);
+                    const stats = await fs.stat(frame);
+                    console.log(`📸 Frame: ${path.basename(frame)} - ${stats.size} bytes`);
+                } catch (error) {
+                    console.error(`❌ Frame não encontrado: ${frame}`);
+                }
+            }
+
+            // NÃO REMOVER o diretório temporário aqui!
+            // O ZIP service vai precisar dos arquivos
+            return frameFiles;
+
         } catch (error) {
+            // Em caso de erro, limpar diretório temporário
             await fs.rm(outputDir, { recursive: true, force: true });
 
             if (error.message.includes('not found')) {
