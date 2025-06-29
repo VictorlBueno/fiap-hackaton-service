@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
+
 export class Video {
     constructor(
         public readonly id: string,
@@ -9,7 +11,7 @@ export class Video {
     ) {}
 
     static create(originalName: string, path: string, size: number, userId: string): Video {
-        const id = new Date().toISOString().replace(/[:.]/g, '-');
+        const id = uuidv4();
         return new Video(id, originalName, path, size, userId);
     }
 
@@ -20,6 +22,6 @@ export class Video {
     }
 
     getOutputZipName(): string {
-        return `frames_${this.id}.zip`;
+        return `${this.id}.zip`; // UUID direto como nome do arquivo
     }
 }

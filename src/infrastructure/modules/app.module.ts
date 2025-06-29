@@ -6,13 +6,15 @@ import {VideoController} from "../adapters/controllers/video.controller";
 import {GetJobStatusUseCase} from "../../application/usecases/get-job-status.usecase";
 import {UploadVideoUseCase} from "../../application/usecases/upload-video.usecase";
 import {VideoProcessingService} from "../../domain/service/video-processing.service";
-import {ListProcessedFilesUseCase} from "../../application/usecases/list-processed.usecase";
 import {FfmpegVideoProcessorAdapter} from "../adapters/gateways/ffmpeg-video-processor.adapter";
 import {RabbitMQQueueAdapter} from "../adapters/gateways/rabbitmq-queue.adapter";
 import {FilesystemStorageAdapter} from "../adapters/gateways/filesystem-storage.adapter";
-import {FileJobRepositoryAdapter} from "../adapters/repositories/file-job-repository.adapter";
+import {
+    PostgresJobRepositoryAdapter
+} from "../adapters/repositories/file-job-repository.adapter";
 import {QueueProcessorAdapter} from "../adapters/processors/queue-processor.adapter";
 import {JwtAuthMiddleware} from "../middleware/jwt-auth.middleware";
+import {ListAllJobsUseCase} from "../../application/usecases/list-all-job-usecase";
 
 @Module({
     imports: [
@@ -37,7 +39,6 @@ import {JwtAuthMiddleware} from "../middleware/jwt-auth.middleware";
     providers: [
         UploadVideoUseCase,
         GetJobStatusUseCase,
-        ListProcessedFilesUseCase,
         VideoProcessingService,
         {
             provide: 'VideoProcessorPort',
@@ -53,13 +54,14 @@ import {JwtAuthMiddleware} from "../middleware/jwt-auth.middleware";
         },
         {
             provide: 'JobRepositoryPort',
-            useClass: FileJobRepositoryAdapter,
+            useClass: PostgresJobRepositoryAdapter,
         },
 
+        PostgresJobRepositoryAdapter,
         FfmpegVideoProcessorAdapter,
         RabbitMQQueueAdapter,
+        ListAllJobsUseCase,
         FilesystemStorageAdapter,
-        FileJobRepositoryAdapter,
         QueueProcessorAdapter,
     ],
 })
