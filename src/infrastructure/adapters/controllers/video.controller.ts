@@ -1,225 +1,242 @@
 import {
-    Controller,
-    Get,
-    Header,
-    HttpStatus,
-    Param,
-    Post,
-    Req,
-    Res,
-    UploadedFile,
-    UseInterceptors
+  Controller,
+  Get,
+  Header,
+  HttpStatus,
+  Param,
+  Post,
+  Req,
+  Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
-import {FileInterceptor} from '@nestjs/platform-express';
-import {ApiBearerAuth, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {Response} from 'express';
-import {diskStorage} from 'multer';
-import {ProcessingJob} from '../../../domain/entities/processing-job.entity';
-import {UploadResponse} from '../../../application/ports/controllers/video-upload.port';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Response } from 'express';
+import { diskStorage } from 'multer';
+import { ProcessingJob } from '../../../domain/entities/processing-job.entity';
+import { UploadResponse } from '../../../application/ports/controllers/video-upload.port';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import {UploadVideoUseCase} from "../../../application/usecases/upload-video.usecase";
-import {GetJobStatusUseCase} from "../../../application/usecases/get-job-status.usecase";
-import {ListProcessedFilesUseCase} from "../../../application/usecases/list-processed.usecase";
-import {AuthenticatedRequest} from "../../middleware/jwt-auth.middleware";
+import { UploadVideoUseCase } from '../../../application/usecases/upload-video.usecase';
+import { GetJobStatusUseCase } from '../../../application/usecases/get-job-status.usecase';
+import { ListProcessedFilesUseCase } from '../../../application/usecases/list-processed.usecase';
+import { AuthenticatedRequest } from '../../middleware/jwt-auth.middleware';
 
 @ApiTags('Video Processing')
 @ApiBearerAuth('JWT-auth')
 @Controller()
 export class VideoController {
-    constructor(
-        private readonly uploadVideoUseCase: UploadVideoUseCase,
-        private readonly getJobStatusUseCase: GetJobStatusUseCase,
-        private readonly listProcessedFilesUseCase: ListProcessedFilesUseCase,
-    ) {
+  constructor(
+    private readonly uploadVideoUseCase: UploadVideoUseCase,
+    private readonly getJobStatusUseCase: GetJobStatusUseCase,
+    private readonly listProcessedFilesUseCase: ListProcessedFilesUseCase,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Página inicial com formulário de upload' })
+  @Header('Content-Type', 'text/html')
+  getHome(): string {
+    return this.getHTMLForm();
+  }
+
+  @Post('upload')
+  @ApiOperation({ summary: 'Upload de vídeo para processamento' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Upload realizado com sucesso' })
+  @UseInterceptors(
+    FileInterceptor('video', {
+      storage: diskStorage({
+        destination: 'uploads',
+        filename: (req, file, cb) => {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          cb(null, `${timestamp}_${file.originalname}`);
+        },
+      }),
+    }),
+  )
+  async uploadVideo(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UploadResponse> {
+    try {
+      const userId = req.userId || 'anonymous-user';
+      console.log(`📤 Upload do usuário: ${userId}`);
+
+      return await this.uploadVideoUseCase.execute(file, userId);
+    } catch (error) {
+      console.error('❌ Erro no upload:', error.message);
+      return {
+        success: false,
+        message: `Erro interno: ${error.message}`,
+      };
+    }
+  }
+
+  @Get('api/job/:jobId')
+  @ApiOperation({
+    summary: 'Verificar status do job',
+    description: 'Retorna apenas jobs que pertencem ao usuário autenticado',
+  })
+  @ApiParam({
+    name: 'jobId',
+    description: 'ID do job de processamento',
+    example: '2025-06-28T16-43-36-099Z',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status do job retornado com sucesso',
+    type: ProcessingJob,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Job não encontrado ou não pertence ao usuário',
+  })
+  async getJobStatus(
+    @Param('jobId') jobId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.userId || 'anonymous-user';
+    const job = await this.getJobStatusUseCase.execute(jobId, userId);
+
+    if (!job) {
+      return { error: 'Job não encontrado ou não pertence ao usuário' };
     }
 
-    @Get()
-    @ApiOperation({summary: 'Página inicial com formulário de upload'})
-    @Header('Content-Type', 'text/html')
-    getHome(): string {
-        return this.getHTMLForm();
-    }
+    return job;
+  }
 
-    @Post('upload')
-    @ApiOperation({summary: 'Upload de vídeo para processamento'})
-    @ApiConsumes('multipart/form-data')
-    @ApiResponse({status: 200, description: 'Upload realizado com sucesso'})
-    @UseInterceptors(FileInterceptor('video', {
-        storage: diskStorage({
-            destination: 'uploads',
-            filename: (req, file, cb) => {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                cb(null, `${timestamp}_${file.originalname}`);
-            },
-        }),
-    }))
-    async uploadVideo(
-        @UploadedFile() file: Express.Multer.File,
-        @Req() req: AuthenticatedRequest
-    ): Promise<UploadResponse> {
-        try {
-            const userId = req.userId || 'anonymous-user';
-            console.log(`📤 Upload do usuário: ${userId}`);
-
-            return await this.uploadVideoUseCase.execute(file, userId);
-        } catch (error) {
-            console.error('❌ Erro no upload:', error.message);
-            return {
-                success: false,
-                message: `Erro interno: ${error.message}`
-            };
-        }
-    }
-
-    @Get('api/job/:jobId')
-    @ApiOperation({
-        summary: 'Verificar status do job',
-        description: 'Retorna apenas jobs que pertencem ao usuário autenticado'
-    })
-    @ApiParam({
-        name: 'jobId',
-        description: 'ID do job de processamento',
-        example: '2025-06-28T16-43-36-099Z'
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Status do job retornado com sucesso',
-        type: ProcessingJob
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Job não encontrado ou não pertence ao usuário'
-    })
-    async getJobStatus(
-        @Param('jobId') jobId: string,
-        @Req() req: AuthenticatedRequest
-    ) {
-        const userId = req.userId || 'anonymous-user';
-        const job = await this.getJobStatusUseCase.execute(jobId, userId);
-
-        if (!job) {
-            return {error: 'Job não encontrado ou não pertence ao usuário'};
-        }
-
-        return job;
-    }
-
-    @Get('download/:filename')
-    @ApiOperation({
-        summary: 'Download do arquivo processado',
-        description: 'Permite download apenas de arquivos que pertencem ao usuário autenticado'
-    })
-    @ApiParam({
-        name: 'filename',
-        description: 'Nome do arquivo ZIP',
-        example: 'frames_2025-06-28T16-43-36-099Z.zip'
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Arquivo enviado com sucesso',
-        content: {
-            'application/zip': {
-                schema: {
-                    type: 'string',
-                    format: 'binary'
-                }
-            }
-        }
-    })
-    @ApiResponse({
-        status: 403,
-        description: 'Arquivo não pertence ao usuário'
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Arquivo não encontrado'
-    })
-    async downloadFile(
-        @Param('filename') filename: string,
-        @Res() res: Response,
-        @Req() req: AuthenticatedRequest
-    ) {
-        const userId = req.userId || 'anonymous-user';
-
-        // Verificar se o arquivo pertence ao usuário antes do download
-        const jobId = this.extractJobIdFromFilename(filename);
-        const job = await this.getJobStatusUseCase.execute(jobId, userId);
-
-        if (!job) {
-            return res.status(HttpStatus.FORBIDDEN).json({
-                error: 'Arquivo não encontrado ou não pertence ao usuário'
-            });
-        }
-
-        const filePath = path.join('outputs', filename);
-
-        try {
-            await fs.access(filePath);
-            res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-            res.setHeader('Content-Type', 'application/zip');
-            res.sendFile(path.resolve(filePath));
-        } catch {
-            res.status(HttpStatus.NOT_FOUND).json({error: 'Arquivo não encontrado'});
-        }
-    }
-
-    @Get('api/status')
-    @ApiOperation({
-        summary: 'Listar arquivos processados do usuário',
-        description: 'Retorna apenas arquivos que pertencem ao usuário autenticado'
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Lista de arquivos do usuário',
+  @Get('download/:filename')
+  @ApiOperation({
+    summary: 'Download do arquivo processado',
+    description:
+      'Permite download apenas de arquivos que pertencem ao usuário autenticado',
+  })
+  @ApiParam({
+    name: 'filename',
+    description: 'Nome do arquivo ZIP',
+    example: 'frames_2025-06-28T16-43-36-099Z.zip',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Arquivo enviado com sucesso',
+    content: {
+      'application/zip': {
         schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Arquivo não pertence ao usuário',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Arquivo não encontrado',
+  })
+  async downloadFile(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.userId!;
+
+    // Verificar se o arquivo pertence ao usuário antes do download
+    const jobId = this.extractJobIdFromFilename(filename);
+    const job = await this.getJobStatusUseCase.execute(jobId, userId);
+
+    if (!job) {
+      return res.status(HttpStatus.FORBIDDEN).json({
+        error: 'Arquivo não encontrado ou não pertence ao usuário',
+      });
+    }
+
+    const filePath = path.join('outputs', filename);
+
+    try {
+      await fs.access(filePath);
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      res.setHeader('Content-Type', 'application/zip');
+      res.sendFile(path.resolve(filePath));
+    } catch {
+      res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ error: 'Arquivo não encontrado' });
+    }
+  }
+
+  @Get('api/status')
+  @ApiOperation({
+    summary: 'Listar arquivos processados do usuário',
+    description: 'Retorna apenas arquivos que pertencem ao usuário autenticado',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de arquivos do usuário',
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
             type: 'object',
             properties: {
-                files: {
-                    type: 'array',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            filename: {type: 'string', example: 'frames_2025-06-28T16-43-36-099Z.zip'},
-                            size: {type: 'number', example: 1048576},
-                            created_at: {type: 'string', example: '2025-06-28 16:43:36'},
-                            download_url: {type: 'string', example: '/download/frames_2025-06-28T16-43-36-099Z.zip'}
-                        }
-                    }
-                },
-                total: {type: 'number', example: 3},
-                userId: {type: 'string', example: 'user-123'}
-            }
-        }
-    })
-    async getStatus(@Req() req: AuthenticatedRequest) {
-        try {
-            const userId = req.userId || 'anonymous-user';
-            console.log(`📋 Listando arquivos do usuário: ${userId}`);
+              filename: {
+                type: 'string',
+                example: 'frames_2025-06-28T16-43-36-099Z.zip',
+              },
+              size: { type: 'number', example: 1048576 },
+              created_at: { type: 'string', example: '2025-06-28 16:43:36' },
+              download_url: {
+                type: 'string',
+                example: '/download/frames_2025-06-28T16-43-36-099Z.zip',
+              },
+            },
+          },
+        },
+        total: { type: 'number', example: 3 },
+        userId: { type: 'string', example: 'user-123' },
+      },
+    },
+  })
+  async getStatus(@Req() req: AuthenticatedRequest) {
+    try {
+      const userId = req.userId || 'anonymous-user';
+      console.log(`📋 Listando arquivos do usuário: ${userId}`);
 
-            const files = await this.listProcessedFilesUseCase.execute(userId);
-            return {
-                files: files.map(file => ({
-                    filename: file.filename,
-                    size: file.size,
-                    created_at: file.getFormattedDate(),
-                    download_url: file.downloadUrl
-                })),
-                total: files.length,
-                userId: userId,
-            };
-        } catch (error) {
-            return {error: 'Erro ao listar arquivos'};
-        }
+      const files = await this.listProcessedFilesUseCase.execute(userId);
+      return {
+        files: files.map((file) => ({
+          filename: file.filename,
+          size: file.size,
+          created_at: file.getFormattedDate(),
+          download_url: file.downloadUrl,
+        })),
+        total: files.length,
+        userId: userId,
+      };
+    } catch (error) {
+      return { error: 'Erro ao listar arquivos' };
     }
+  }
 
-    private extractJobIdFromFilename(filename: string): string {
-        const match = filename.match(/frames_(.+)\.zip$/);
-        return match ? match[1] : '';
-    }
+  private extractJobIdFromFilename(filename: string): string {
+    const match = filename.match(/frames_(.+)\.zip$/);
+    return match ? match[1] : '';
+  }
 
-    private getHTMLForm(): string {
-        return `
+  private getHTMLForm(): string {
+    return `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -484,5 +501,5 @@ export class VideoController {
     </script>
 </body>
 </html>`;
-    }
+  }
 }
