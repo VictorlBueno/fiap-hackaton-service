@@ -15,6 +15,9 @@ import {
 import {QueueProcessorAdapter} from "../adapters/processors/queue-processor.adapter";
 import {JwtAuthMiddleware} from "../middleware/jwt-auth.middleware";
 import {ListAllJobsUseCase} from "../../application/usecases/list-all-job-usecase";
+import {EmailNotificationService} from "../../domain/service/email-notification.service";
+import {GmailEmailProviderAdapter} from "../adapters/gateways/gmail-email-provider.adapter";
+import {AuthServiceAdapter} from "../adapters/gateways/auth-service.adapter";
 
 @Module({
     imports: [
@@ -63,6 +66,13 @@ import {ListAllJobsUseCase} from "../../application/usecases/list-all-job-usecas
         ListAllJobsUseCase,
         S3StorageAdapter,
         QueueProcessorAdapter,
+        EmailNotificationService,
+        AuthServiceAdapter,
+        {
+            provide: 'EmailProviderPort',
+            useClass: GmailEmailProviderAdapter,
+        },
+        GmailEmailProviderAdapter,
     ],
 })
 

@@ -3,6 +3,7 @@ import { VideoProcessorPort } from '../../ports/gateways/video-processor.port';
 import { VideoProcessingService } from '../video-processing.service';
 import { FileStoragePort } from '../../ports/gateways/file-storage.port';
 import { JobRepositoryPort } from '../../ports/repositories/job-repository.port';
+import { EmailNotificationService } from '../email-notification.service';
 import { Video } from '../../entities/video.entity';
 import { JobStatus, ProcessingJob } from '../../entities/processing-job.entity';
 
@@ -35,6 +36,10 @@ describe('VideoProcessingService', () => {
       fileExists: jest.fn(),
       createZip: jest.fn(),
       deleteFile: jest.fn(),
+      uploadFile: jest.fn(),
+      downloadFile: jest.fn(),
+      getSignedDownloadUrl: jest.fn(),
+      getFileStream: jest.fn(),
     };
 
     const mockJobRepository: {
@@ -47,12 +52,17 @@ describe('VideoProcessingService', () => {
       findJobById: jest.fn(),
     };
 
+    const mockEmailNotificationService = {
+      notifyVideoProcessingComplete: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VideoProcessingService,
         { provide: 'VideoProcessorPort', useValue: mockVideoProcessor },
         { provide: 'FileStoragePort', useValue: mockFileStorage },
         { provide: 'JobRepositoryPort', useValue: mockJobRepository },
+        { provide: EmailNotificationService, useValue: mockEmailNotificationService },
       ],
     }).compile();
 

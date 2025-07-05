@@ -14,7 +14,7 @@ export class UploadVideoUseCase {
         @Inject('FileStoragePort') private readonly fileStorage: FileStoragePort,
     ) {}
 
-    async execute(file: Express.Multer.File, userId: string): Promise<UploadResponse> {
+    async execute(file: Express.Multer.File, userId: string, userEmail?: string): Promise<UploadResponse> {
         if (!file) {
             return { success: false, message: 'Nenhum arquivo recebido' };
         }
@@ -41,6 +41,7 @@ export class UploadVideoUseCase {
             videoPath: video.path,
             videoName: video.originalName,
             userId: userId,
+            userEmail: userEmail,
         };
 
         const queued = await this.queue.sendMessage(message);

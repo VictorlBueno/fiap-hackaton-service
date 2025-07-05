@@ -4,6 +4,7 @@ import { JobStatus, ProcessingJob } from '../entities/processing-job.entity';
 import { VideoProcessorPort } from '../ports/gateways/video-processor.port';
 import { FileStoragePort } from '../ports/gateways/file-storage.port';
 import { JobRepositoryPort } from '../ports/repositories/job-repository.port';
+import { EmailNotificationService } from './email-notification.service';
 import * as fs from 'fs/promises';
 
 @Injectable()
@@ -14,13 +15,10 @@ export class VideoProcessingService {
     @Inject('FileStoragePort') private readonly fileStorage: FileStoragePort,
     @Inject('JobRepositoryPort')
     private readonly jobRepository: JobRepositoryPort,
+    private readonly emailNotificationService: EmailNotificationService,
   ) {}
 
-  async processVideo(video: Video): Promise<ProcessingJob | null> {
-    console.log(
-      `Iniciando processamento para usuário ${video.userId}: ${video.originalName}`,
-    );
-
+  async processVideo(video: Video, userSub: string): Promise<ProcessingJob | null> {
     await this.jobRepository.updateJobStatus(
       video.id,
       JobStatus.PROCESSING,
@@ -42,7 +40,6 @@ export class VideoProcessingService {
 
       const s3VideoKey = `uploads/${video.id}_${video.originalName}`;
       await this.fileStorage.uploadFile(video.path, s3VideoKey);
-      console.log(`Vídeo enviado para S3: ${s3VideoKey}`);
 
       const s3VideoExists = await this.fileStorage.fileExists(s3VideoKey);
       if (!s3VideoExists) {
@@ -55,7 +52,6 @@ export class VideoProcessingService {
       }
 
       const tempDir = `temp/${video.id}`;
-      console.log(`📁 Criando diretório temporário: ${tempDir}`);
 
       const frames = await this.videoProcessor.extractFrames(
         video.path,
@@ -71,13 +67,8 @@ export class VideoProcessingService {
         throw new Error('Nenhum frame extraído do vídeo');
       }
 
-      console.log(
-        `Extraídos ${frames.length} frames para usuário ${video.userId}`,
-      );
-
       const zipFilename = `${video.id}.zip`;
       const zipPath = `outputs/${zipFilename}`;
-      console.log(`Criando ZIP: ${zipPath}`);
 
       await this.fileStorage.createZip(frames, zipPath);
 
@@ -91,8 +82,6 @@ export class VideoProcessingService {
         );
         throw new Error('Falha ao criar arquivo ZIP no S3');
       }
-
-      console.log(`ZIP criado com sucesso no S3: ${s3ZipKey}`);
 
       await this.jobRepository.updateJobStatus(
         video.id,
@@ -108,16 +97,21 @@ export class VideoProcessingService {
       
       try {
         await fs.rm(tempDir, { recursive: true, force: true });
-        console.log(`🗑️ Pasta temporária removida: ${tempDir}`);
       } catch (error) {
-        console.warn(`⚠️ Erro ao remover pasta temporária: ${error.message}`);
+        console.warn(`Erro ao remover pasta temporária: ${error.message}`);
       }
 
-      console.log(
-        `Processamento concluído para usuário ${video.userId}: ${video.id}`,
-      );
+      const result = await this.jobRepository.findJobById(video.id, video.userId);
+      
+      if (result) {
+        try {
+          await this.emailNotificationService.notifyVideoProcessingComplete(result, userSub);
+        } catch (emailError) {
+          console.warn(`Erro ao enviar e-mail de notificação: ${emailError.message}`);
+        }
+      }
 
-      return await this.jobRepository.findJobById(video.id, video.userId);
+      return result;
     } catch (error) {
       console.error(
         `Erro no processamento para usuário ${video.userId}:`,
@@ -129,6 +123,15 @@ export class VideoProcessingService {
         JobStatus.FAILED,
         error.message,
       );
+
+      try {
+        const failedJob = await this.jobRepository.findJobById(video.id, video.userId);
+        if (failedJob) {
+          await this.emailNotificationService.notifyVideoProcessingComplete(failedJob, userSub);
+        }
+      } catch (emailError) {
+        console.warn(`Erro ao enviar e-mail de notificação de erro: ${emailError.message}`);
+      }
 
       throw error;
     }

@@ -12,8 +12,6 @@ export class QueueProcessorAdapter implements OnModuleInit {
     }
 
     async onModuleInit() {
-        console.log('Iniciando processador de fila...');
-
         setTimeout(async () => {
             await this.startProcessing();
         }, 2000);
@@ -22,16 +20,12 @@ export class QueueProcessorAdapter implements OnModuleInit {
     private async startProcessing() {
         try {
             await this.queue.consumeMessages(this.processMessage.bind(this));
-            console.log('Processador de fila iniciado');
         } catch (error) {
-            console.error('Erro no processador:', error.message);
             setTimeout(() => this.startProcessing(), 5000);
         }
     }
 
     private async processMessage(message: QueueMessage): Promise<void> {
-        console.log(`Processando vídeo do usuário ${message.userId}: ${message.videoName} (ID: ${message.id})`);
-
         try {
             const video = new Video(
                 message.id,
@@ -42,11 +36,9 @@ export class QueueProcessorAdapter implements OnModuleInit {
                 new Date()
             );
 
-            const result = await this.videoProcessingService.processVideo(video);
+            const result = await this.videoProcessingService.processVideo(video, message.userId);
 
-            if (result?.isCompleted()) {
-                console.log(`Processamento concluído para usuário ${message.userId}: ${message.id}`);
-            } else if (result?.isFailed()) {
+            if (result?.isFailed()) {
                 console.error(`Processamento falhou para usuário ${message.userId}: ${message.id} - ${result.message}`);
             }
 
