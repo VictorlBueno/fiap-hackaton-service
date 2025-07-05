@@ -27,7 +27,6 @@ export class FfmpegVideoProcessorAdapter implements VideoProcessorPort {
 
       console.log(`${frameFiles.length} frames extraídos em: ${outputDir}`);
 
-      // Verificar se os arquivos realmente existem
       for (const frame of frameFiles) {
         try {
           await fs.access(frame);

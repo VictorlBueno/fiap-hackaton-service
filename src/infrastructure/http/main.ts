@@ -14,13 +14,11 @@ async function bootstrap() {
     }
   });
 
-  // Inicializar banco de dados
   await initDatabase();
 
   console.log('🚀 Iniciando aplicação com Arquitetura Hexagonal...');
   const app = await NestFactory.create(AppModule);
 
-  // Configuração do Swagger com JWT
   const config = new DocumentBuilder()
     .setTitle('Video Processor API - Hexagonal Architecture')
     .setDescription(

@@ -8,7 +8,7 @@ import {UploadVideoUseCase} from "../../application/usecases/upload-video.usecas
 import {VideoProcessingService} from "../../domain/service/video-processing.service";
 import {FfmpegVideoProcessorAdapter} from "../adapters/gateways/ffmpeg-video-processor.adapter";
 import {RabbitMQQueueAdapter} from "../adapters/gateways/rabbitmq-queue.adapter";
-import {FilesystemStorageAdapter} from "../adapters/gateways/filesystem-storage.adapter";
+import {S3StorageAdapter} from "../adapters/gateways/s3-storage.adapter";
 import {
     PostgresJobRepositoryAdapter
 } from "../adapters/repositories/file-job-repository.adapter";
@@ -50,7 +50,7 @@ import {ListAllJobsUseCase} from "../../application/usecases/list-all-job-usecas
         },
         {
             provide: 'FileStoragePort',
-            useClass: FilesystemStorageAdapter,
+            useClass: S3StorageAdapter,
         },
         {
             provide: 'JobRepositoryPort',
@@ -61,7 +61,7 @@ import {ListAllJobsUseCase} from "../../application/usecases/list-all-job-usecas
         FfmpegVideoProcessorAdapter,
         RabbitMQQueueAdapter,
         ListAllJobsUseCase,
-        FilesystemStorageAdapter,
+        S3StorageAdapter,
         QueueProcessorAdapter,
     ],
 })

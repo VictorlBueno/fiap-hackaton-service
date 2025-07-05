@@ -4,6 +4,7 @@ import { JobStatus, ProcessingJob } from '../entities/processing-job.entity';
 import { VideoProcessorPort } from '../ports/gateways/video-processor.port';
 import { FileStoragePort } from '../ports/gateways/file-storage.port';
 import { JobRepositoryPort } from '../ports/repositories/job-repository.port';
+import * as fs from 'fs/promises';
 
 @Injectable()
 export class VideoProcessingService {
@@ -34,9 +35,23 @@ export class VideoProcessingService {
         await this.jobRepository.updateJobStatus(
           video.id,
           JobStatus.FAILED,
-          `Arquivo de vídeo não encontrado: ${video.path}`,
+          `Arquivo de vídeo local não encontrado: ${video.path}`,
         );
-        throw new Error(`Arquivo de vídeo não encontrado: ${video.path}`);
+        throw new Error(`Arquivo de vídeo local não encontrado: ${video.path}`);
+      }
+
+      const s3VideoKey = `uploads/${video.id}_${video.originalName}`;
+      await this.fileStorage.uploadFile(video.path, s3VideoKey);
+      console.log(`Vídeo enviado para S3: ${s3VideoKey}`);
+
+      const s3VideoExists = await this.fileStorage.fileExists(s3VideoKey);
+      if (!s3VideoExists) {
+        await this.jobRepository.updateJobStatus(
+          video.id,
+          JobStatus.FAILED,
+          `Falha no upload do vídeo para S3: ${s3VideoKey}`,
+        );
+        throw new Error(`Falha no upload do vídeo para S3: ${s3VideoKey}`);
       }
 
       const tempDir = `temp/${video.id}`;
@@ -66,17 +81,18 @@ export class VideoProcessingService {
 
       await this.fileStorage.createZip(frames, zipPath);
 
-      const zipExists = await this.fileStorage.fileExists(zipPath);
+      const s3ZipKey = `outputs/${zipFilename}`;
+      const zipExists = await this.fileStorage.fileExists(s3ZipKey);
       if (!zipExists) {
         await this.jobRepository.updateJobStatus(
           video.id,
           JobStatus.FAILED,
-          'Falha ao criar arquivo ZIP',
+          'Falha ao criar arquivo ZIP no S3',
         );
-        throw new Error('Falha ao criar arquivo ZIP');
+        throw new Error('Falha ao criar arquivo ZIP no S3');
       }
 
-      console.log(`ZIP criado com sucesso: ${zipPath}`);
+      console.log(`ZIP criado com sucesso no S3: ${s3ZipKey}`);
 
       await this.jobRepository.updateJobStatus(
         video.id,
@@ -89,6 +105,13 @@ export class VideoProcessingService {
       );
 
       await this.fileStorage.deleteFile(video.path);
+      
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+        console.log(`🗑️ Pasta temporária removida: ${tempDir}`);
+      } catch (error) {
+        console.warn(`⚠️ Erro ao remover pasta temporária: ${error.message}`);
+      }
 
       console.log(
         `Processamento concluído para usuário ${video.userId}: ${video.id}`,
