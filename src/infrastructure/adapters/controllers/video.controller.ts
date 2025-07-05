@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Req,
@@ -20,6 +21,7 @@ import { GetJobStatusUseCase } from '../../../application/usecases/get-job-statu
 import { ListAllJobsUseCase } from '../../../application/usecases/list-all-job-usecase';
 import { AuthenticatedRequest } from '../../middleware/jwt-auth.middleware';
 import Format from '../utils/format';
+import { FileStoragePort } from '../../../domain/ports/gateways/file-storage.port';
 import {
   DownloadFileSwagger,
   GetJobStatusSwagger,
@@ -35,6 +37,7 @@ export class VideoController {
     private readonly uploadVideoUseCase: UploadVideoUseCase,
     private readonly getJobStatusUseCase: GetJobStatusUseCase,
     private readonly listAllJobsUseCase: ListAllJobsUseCase,
+    @Inject('FileStoragePort') private readonly fileStorage: FileStoragePort,
   ) {}
 
   @Post('upload')
@@ -97,17 +100,15 @@ export class VideoController {
       });
     }
 
-    const filePath = path.join('outputs', filename);
-
     try {
-      await fs.access(filePath);
-      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      const s3Key = `outputs/${filename}`;
+      const fileStream = await this.fileStorage.getFileStream(s3Key);
       res.setHeader('Content-Type', 'application/zip');
-      res.sendFile(path.resolve(filePath));
-    } catch {
-      res
-        .status(HttpStatus.NOT_FOUND)
-        .json({ error: 'Arquivo físico não encontrado' });
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Erro ao baixar arquivo do S3:', error.message);
+      res.status(HttpStatus.NOT_FOUND).json({ error: 'Erro ao baixar arquivo do S3' });
     }
   }
 

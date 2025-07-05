@@ -1,6 +1,6 @@
 # Video Processor - Docker Commands
 
-.PHONY: help up down logs ps clean restart db-shell mq-ui
+.PHONY: help up down logs ps clean restart db-shell mq-ui mq-clear-queue mq-list-queues mq-purge-all cleanup
 
 help: ## Mostrar ajuda
 	@echo "Comandos disponíveis:"
@@ -44,6 +44,35 @@ mq-ui: ## Abrir RabbitMQ Management UI
 	@echo "URL: http://localhost:15672"
 	@echo "User: admin"
 	@echo "Pass: admin123"
+
+mq-list-queues: ## Listar todas as filas do RabbitMQ
+	@echo "📋 Listando filas do RabbitMQ..."
+	docker-compose exec rabbitmq rabbitmqctl list_queues name messages consumers
+
+mq-clear-queue: ## Limpar fila específica (use QUEUE_NAME=nome_da_fila)
+	@echo "🧹 Limpando fila: $(or $(QUEUE_NAME),video_processing_queue)"
+	@if [ -z "$(QUEUE_NAME)" ]; then \
+		echo "💡 Use: make mq-clear-queue QUEUE_NAME=nome_da_fila"; \
+		echo "📋 Filas disponíveis:"; \
+		docker-compose exec rabbitmq rabbitmqctl list_queues name; \
+	else \
+		docker-compose exec rabbitmq rabbitmqctl purge_queue $(QUEUE_NAME); \
+		echo "✅ Fila $(QUEUE_NAME) limpa!"; \
+	fi
+
+mq-purge-all: ## Limpar todas as filas do RabbitMQ
+	@echo "🧹 Limpando todas as filas do RabbitMQ..."
+	@docker-compose exec rabbitmq rabbitmqctl list_queues name | grep -v "Listing queues" | while read queue; do \
+		if [ ! -z "$$queue" ]; then \
+			echo "Limpando fila: $$queue"; \
+			docker-compose exec rabbitmq rabbitmqctl purge_queue "$$queue"; \
+		fi; \
+	done
+	@echo "✅ Todas as filas foram limpas!"
+
+cleanup: ## Limpar pastas temporárias (uploads, outputs, temp)
+	@echo "🧹 Limpando pastas temporárias..."
+	@./scripts/cleanup.sh
 
 clean: ## Limpar volumes e containers
 	@echo "🧹 Limpeza completa..."

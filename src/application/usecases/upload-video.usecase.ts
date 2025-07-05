@@ -32,6 +32,11 @@ export class UploadVideoUseCase {
         const job = ProcessingJob.createPending(video.id, video.originalName, userId);
         await this.jobRepository.saveJob(job);
 
+        // Faz upload do vídeo para o S3
+        const s3VideoKey = `uploads/${video.id}_${video.originalName}`;
+        await this.fileStorage.uploadFile(video.path, s3VideoKey);
+        console.log(`Vídeo enviado para S3: ${s3VideoKey}`);
+
         const message: QueueMessage = {
             id: video.id,
             videoPath: video.path,
