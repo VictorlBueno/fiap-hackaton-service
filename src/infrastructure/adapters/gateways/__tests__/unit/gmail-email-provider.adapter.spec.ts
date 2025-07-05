@@ -69,7 +69,7 @@ describe('GmailEmailProviderAdapter', () => {
         await adapter.sendEmail(mockEmailData);
 
         expect(consoleLogSpy).toHaveBeenCalledWith(
-          '✅ E-mail enviado com sucesso para: test@example.com'
+          'E-mail enviado com sucesso para: test@example.com'
         );
 
         consoleLogSpy.mockRestore();
@@ -90,7 +90,7 @@ describe('GmailEmailProviderAdapter', () => {
 
         expect(result).toBe(false);
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '❌ Erro ao enviar e-mail para test@example.com:',
+          'Erro ao enviar e-mail para test@example.com:',
           'SMTP connection failed'
         );
 

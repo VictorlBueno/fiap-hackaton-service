@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
-import { initDatabase } from '../config/database.config';
 import { AppModule } from '../modules/app.module';
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -13,8 +12,6 @@ async function bootstrap() {
       fs.mkdirSync(dir, { recursive: true });
     }
   });
-
-  await initDatabase();
 
   console.log('🚀 Iniciando aplicação com Arquitetura Hexagonal...');
   const app = await NestFactory.create(AppModule);
