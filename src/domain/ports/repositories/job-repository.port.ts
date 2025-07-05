@@ -8,7 +8,7 @@ export interface JobRepositoryPort {
 
   getProcessedFilesByUser(userId: string): Promise<ProcessedFile[]>;
 
-  getAllJobsByUser(userId: string): Promise<ProcessingJob[]>; // <- Nova função
+  getAllJobsByUser(userId: string): Promise<ProcessingJob[]>;
   updateJobStatus(
     id: string,
     status: JobStatus,

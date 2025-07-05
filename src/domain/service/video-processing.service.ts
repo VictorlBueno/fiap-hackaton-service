@@ -30,8 +30,6 @@ export class VideoProcessingService {
     await this.jobRepository.updateJobVideoPath(video.id, video.path);
 
     try {
-      // O video.path contém o caminho local do arquivo (ex: uploads/2025-07-05T17-52-18-297Z_SampleVideo_1280x720_1mb.mp4)
-      // Primeiro verifica se o arquivo local existe
       const videoExists = await this.fileStorage.fileExists(video.path);
       if (!videoExists) {
         await this.jobRepository.updateJobStatus(
@@ -42,12 +40,10 @@ export class VideoProcessingService {
         throw new Error(`Arquivo de vídeo local não encontrado: ${video.path}`);
       }
 
-      // Faz upload do vídeo para o S3 com nome padronizado
       const s3VideoKey = `uploads/${video.id}_${video.originalName}`;
       await this.fileStorage.uploadFile(video.path, s3VideoKey);
       console.log(`Vídeo enviado para S3: ${s3VideoKey}`);
 
-      // Verifica se o upload para S3 foi bem-sucedido
       const s3VideoExists = await this.fileStorage.fileExists(s3VideoKey);
       if (!s3VideoExists) {
         await this.jobRepository.updateJobStatus(
@@ -85,7 +81,6 @@ export class VideoProcessingService {
 
       await this.fileStorage.createZip(frames, zipPath);
 
-      // Verifica se o ZIP foi criado no S3
       const s3ZipKey = `outputs/${zipFilename}`;
       const zipExists = await this.fileStorage.fileExists(s3ZipKey);
       if (!zipExists) {
@@ -109,10 +104,8 @@ export class VideoProcessingService {
         },
       );
 
-      // Remove arquivos temporários
       await this.fileStorage.deleteFile(video.path);
       
-      // Remove pasta temporária com frames
       try {
         await fs.rm(tempDir, { recursive: true, force: true });
         console.log(`🗑️ Pasta temporária removida: ${tempDir}`);

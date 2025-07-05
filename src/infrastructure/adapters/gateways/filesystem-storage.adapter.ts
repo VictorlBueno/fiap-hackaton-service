@@ -42,19 +42,16 @@ export class FilesystemStorageAdapter implements FileStoragePort {
   }
 
   async uploadFile(localPath: string, s3Key: string): Promise<string> {
-    // Para o adaptador de filesystem, apenas retorna o caminho local
     console.log(`Simulando upload para S3: ${s3Key} -> ${localPath}`);
     return localPath;
   }
 
   async downloadFile(s3Key: string, localPath: string): Promise<void> {
-    // Para o adaptador de filesystem, apenas copia o arquivo
     await fs.copyFile(s3Key, localPath);
     console.log(`Arquivo copiado: ${s3Key} -> ${localPath}`);
   }
 
   async getSignedDownloadUrl(s3Key: string, expiresIn: number = 3600): Promise<string> {
-    // Para o adaptador de filesystem, retorna uma URL local
     return `/outputs/${s3Key}`;
   }
 

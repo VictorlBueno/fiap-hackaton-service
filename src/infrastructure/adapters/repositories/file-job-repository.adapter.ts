@@ -103,7 +103,6 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
       for (const row of result.rows) {
         if (row.zip_filename) {
           try {
-            // Tentar obter stats do arquivo físico
             const fs = await import('fs/promises');
             const path = await import('path');
             const filePath = path.join('outputs', row.zip_filename);
@@ -118,7 +117,6 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
               ),
             );
           } catch (fsError) {
-            // Se arquivo não existe fisicamente, incluir com tamanho 0
             files.push(
               new ProcessedFile(
                 row.zip_filename,

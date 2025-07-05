@@ -18,20 +18,17 @@ export class S3StorageAdapter implements FileStoragePort {
     console.log(`🔧 Configurando S3 Client - Região: ${s3Config.region}, Bucket: ${s3Config.bucketName}`);
     this.s3Client = new S3Client({
       region: s3Config.region,
-      // Não passar credentials, o SDK usará as permissões do ambiente (Lambda, EC2, etc)
     });
   }
 
   async deleteFile(filePath: string): Promise<void> {
     try {
-      // Se for um arquivo local (upload temporário), deleta localmente
       if (filePath.startsWith('uploads/') || filePath.startsWith('temp/')) {
         await fs.unlink(filePath);
         console.log(`Arquivo local removido: ${filePath}`);
         return;
       }
 
-      // Se for um arquivo S3, deleta do bucket
       const key = this.getS3Key(filePath);
       await this.s3Client.send(
         new DeleteObjectCommand({
@@ -48,16 +45,13 @@ export class S3StorageAdapter implements FileStoragePort {
   async createZip(files: string[], outputPath: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // Cria um stream temporário para o ZIP
         const tempZipPath = `/tmp/${path.basename(outputPath)}`;
         const output = fsSync.createWriteStream(tempZipPath);
         const archive = archiver('zip', { zlib: { level: 9 } });
 
         output.on('close', async () => {
           try {
-            // Faz upload do ZIP para o S3
             const zipBuffer = await fs.readFile(tempZipPath);
-            // Garante que o ZIP vá para a pasta outputs/
             const s3Key = `outputs/${path.basename(outputPath)}`;
             
             await this.s3Client.send(
@@ -69,7 +63,6 @@ export class S3StorageAdapter implements FileStoragePort {
               })
             );
 
-            // Remove o arquivo temporário
             await fs.unlink(tempZipPath);
             console.log(`ZIP criado e enviado para S3: ${s3Key}`);
             resolve();
@@ -81,7 +74,6 @@ export class S3StorageAdapter implements FileStoragePort {
         archive.on('error', (err) => reject(err));
         archive.pipe(output);
 
-        // Adiciona os arquivos ao ZIP
         let addedFiles = 0;
         for (const file of files) {
           if (await this.fileExists(file)) {
@@ -109,21 +101,18 @@ export class S3StorageAdapter implements FileStoragePort {
 
   async fileExists(filePath: string): Promise<boolean> {
     try {
-      // Se for um arquivo local com timestamp (uploads/2025-07-05T...)
       if (filePath.startsWith('uploads/') && filePath.includes('T')) {
         await fs.access(filePath);
         console.log(`✅ Arquivo local encontrado: ${filePath}`);
         return true;
       }
       
-      // Se for um arquivo local temporário (temp/)
       if (filePath.startsWith('temp/')) {
         await fs.access(filePath);
         console.log(`✅ Arquivo local encontrado: ${filePath}`);
         return true;
       }
 
-      // Se for um arquivo S3 (uploads/ com ID ou outputs/), verifica no bucket
       const key = this.getS3Key(filePath);
       console.log(`🔍 Verificando existência no S3: ${key}`);
       
@@ -192,7 +181,6 @@ export class S3StorageAdapter implements FileStoragePort {
     try {
       console.log(`🔗 Gerando URL assinada para S3 - Bucket: ${s3Config.bucketName}, Key: ${s3Key}`);
       
-      // Verifica se o arquivo existe antes de gerar a URL
       const exists = await this.fileExists(s3Key);
       if (!exists) {
         throw new Error(`Arquivo não encontrado no S3: ${s3Key}`);
@@ -227,12 +215,10 @@ export class S3StorageAdapter implements FileStoragePort {
   }
 
   private getS3Key(filePath: string): string {
-    // Se já tem prefixo S3 (uploads/ ou outputs/), mantém como está
     if (filePath.startsWith('uploads/') || filePath.startsWith('outputs/')) {
       return filePath;
     }
     
-    // Se for um arquivo local (temp/), remove o prefixo
     if (filePath.startsWith('temp/')) {
       return path.basename(filePath);
     }

@@ -57,7 +57,6 @@ describe('QueueProcessorAdapter', () => {
         mockQueue = module.get('QueuePort');
         mockVideoProcessingService = module.get(VideoProcessingService);
 
-        // Mock console methods to avoid noise in tests
         jest.spyOn(console, 'log').mockImplementation();
         jest.spyOn(console, 'error').mockImplementation();
     });
@@ -233,7 +232,6 @@ describe('QueueProcessorAdapter', () => {
 
                 await messageCallback!(message);
 
-                // Should not log completion or failure messages
                 expect(console.log).not.toHaveBeenCalledWith(
                     expect.stringContaining('✅ Processamento concluído')
                 );
