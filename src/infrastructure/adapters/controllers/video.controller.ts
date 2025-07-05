@@ -58,8 +58,8 @@ export class VideoController {
     @Req() req: AuthenticatedRequest,
   ): Promise<UploadResponse> {
     try {
-      console.log(`📤 Upload do usuário: ${req.userId}`);
-      return await this.uploadVideoUseCase.execute(file, req.userId);
+      console.log(`📤 Upload do usuário: ${req.userId} (${req.userEmail})`);
+      return await this.uploadVideoUseCase.execute(file, req.userId, req.userEmail);
     } catch (error) {
       console.error('❌ Erro no upload:', error.message);
       return {

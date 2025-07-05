@@ -5,6 +5,7 @@ import { CognitoJwtVerifierSingleUserPool } from 'aws-jwt-verify/cognito-verifie
 
 export interface AuthenticatedRequest extends Request {
   userId: string;
+  userEmail: string;
   userGroups: string[];
 }
 
@@ -61,9 +62,11 @@ export class JwtAuthMiddleware implements NestMiddleware {
       const payload = await this.verifyToken(token);
 
       req.userId = payload.sub;
+      req.userEmail = payload.email || payload['cognito:username'] || '';
+      
       next();
     } catch (error) {
-      console.error('❌ Erro na validação JWT:', error.message);
+      console.error('Erro na validação JWT:', error.message);
 
       return res.status(HttpStatus.UNAUTHORIZED).json({
         error: 'Token inválido',
