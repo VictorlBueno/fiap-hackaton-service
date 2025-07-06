@@ -60,28 +60,7 @@ variable "db_password" {
   sensitive   = true
 }
 
-# Configurações do RabbitMQ
-variable "rabbitmq_host" {
-  description = "Host do RabbitMQ"
-  type        = string
-}
 
-variable "rabbitmq_port" {
-  description = "Porta do RabbitMQ"
-  type        = string
-  default     = "5672"
-}
-
-variable "rabbitmq_username" {
-  description = "Usuário do RabbitMQ"
-  type        = string
-}
-
-variable "rabbitmq_password" {
-  description = "Senha do RabbitMQ"
-  type        = string
-  sensitive   = true
-}
 
 # Configurações AWS
 variable "aws_access_key_id" {
@@ -92,6 +71,18 @@ variable "aws_access_key_id" {
 
 variable "aws_secret_access_key" {
   description = "AWS Secret Access Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "aws_cognito_user_pool_id" {
+  description = "AWS Cognito User Pool ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "aws_cognito_client_id" {
+  description = "AWS Cognito Client ID"
   type        = string
   sensitive   = true
 }

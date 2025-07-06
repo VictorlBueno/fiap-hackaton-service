@@ -1,8 +1,21 @@
-resource "aws_ecr_repository" "this" {
-  name                 = "${var.project_name}-${var.environment}"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = var.force_delete
+data "aws_secretsmanager_secret" "rabbitmq_credentials" {
+  name = "${var.project_name}/rabbitmq-credentials"
 }
+
+data "aws_secretsmanager_secret_version" "rabbitmq_credentials" {
+  secret_id = data.aws_secretsmanager_secret.rabbitmq_credentials.id
+}
+
+locals {
+  rabbitmq_credentials = jsondecode(data.aws_secretsmanager_secret_version.rabbitmq_credentials.secret_string)
+}
+
+# ECR Repository - Commented out as it already exists
+# resource "aws_ecr_repository" "this" {
+#   name                 = "${var.project_name}-${var.environment}"
+#   image_tag_mutability = "MUTABLE"
+#   force_delete         = var.force_delete
+# }
 
 # Namespace
 resource "kubernetes_namespace" "app" {
@@ -24,7 +37,7 @@ resource "kubernetes_config_map" "app" {
 
   data = {
     NODE_ENV              = "production"
-    PORT                  = "3000"
+    PORT                  = "8080"
     MAX_FILE_SIZE         = "100MB"
     SUPPORTED_FORMATS     = "mp4,avi,mov,wmv,flv,webm"
     PROCESSING_TIMEOUT    = "300000"
@@ -52,13 +65,16 @@ resource "kubernetes_secret" "app" {
     DB_NAME                = var.db_name
     DB_USERNAME            = var.db_username
     DB_PASSWORD            = var.db_password
-    RABBITMQ_HOST          = var.rabbitmq_host
-    RABBITMQ_PORT          = var.rabbitmq_port
-    RABBITMQ_USERNAME      = var.rabbitmq_username
-    RABBITMQ_PASSWORD      = var.rabbitmq_password
+    RABBITMQ_HOST          = local.rabbitmq_credentials.host
+    RABBITMQ_PORT          = local.rabbitmq_credentials.port
+    RABBITMQ_USERNAME      = local.rabbitmq_credentials.username
+    RABBITMQ_PASSWORD      = local.rabbitmq_credentials.password
+    RABBITMQ_URL           = local.rabbitmq_credentials.amqp_url
     AWS_REGION             = var.aws_region
     AWS_ACCESS_KEY_ID      = var.aws_access_key_id
     AWS_SECRET_ACCESS_KEY  = var.aws_secret_access_key
+    AWS_COGNITO_USER_POOL_ID = var.aws_cognito_user_pool_id
+    AWS_COGNITO_CLIENT_ID    = var.aws_cognito_client_id
   }
 }
 
@@ -104,7 +120,7 @@ resource "kubernetes_deployment" "app" {
           image = var.app_image
 
           port {
-            container_port = 3000
+            container_port = 8080
             name          = "http"
           }
 
@@ -310,6 +326,16 @@ resource "kubernetes_deployment" "app" {
           }
 
           env {
+            name = "RABBITMQ_URL"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "RABBITMQ_URL"
+              }
+            }
+          }
+
+          env {
             name = "AWS_REGION"
             value_from {
               secret_key_ref {
@@ -339,6 +365,26 @@ resource "kubernetes_deployment" "app" {
             }
           }
 
+          env {
+            name = "AWS_COGNITO_USER_POOL_ID"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "AWS_COGNITO_USER_POOL_ID"
+              }
+            }
+          }
+
+          env {
+            name = "AWS_COGNITO_CLIENT_ID"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "AWS_COGNITO_CLIENT_ID"
+              }
+            }
+          }
+
           resources {
             requests = {
               cpu    = var.cpu_request
@@ -353,7 +399,7 @@ resource "kubernetes_deployment" "app" {
           liveness_probe {
             http_get {
               path = "/health"
-              port = 3000
+              port = 8080
             }
             initial_delay_seconds = 30
             period_seconds        = 30
@@ -364,7 +410,7 @@ resource "kubernetes_deployment" "app" {
           readiness_probe {
             http_get {
               path = "/health"
-              port = 3000
+              port = 8080
             }
             initial_delay_seconds = 10
             period_seconds        = 10
@@ -392,6 +438,10 @@ resource "kubernetes_deployment" "app" {
           name = "outputs-volume"
           empty_dir {}
         }
+
+        image_pull_secrets {
+          name = "ecr-secret"
+        }
       }
     }
   }
@@ -409,11 +459,11 @@ resource "kubernetes_service" "app" {
   }
 
   spec {
-    type = "ClusterIP"
+    type = "LoadBalancer"
 
     port {
       port        = 80
-      target_port = 3000
+      target_port = 8080
       protocol    = "TCP"
       name        = "http"
     }
@@ -510,6 +560,7 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "app" {
     behavior {
       scale_up {
         stabilization_window_seconds = 60
+        select_policy = "Max"
         policy {
           type = "Percent"
           value = 100
@@ -518,6 +569,7 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "app" {
       }
       scale_down {
         stabilization_window_seconds = 300
+        select_policy = "Min"
         policy {
           type = "Percent"
           value = 10

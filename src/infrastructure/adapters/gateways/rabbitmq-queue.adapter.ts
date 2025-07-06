@@ -18,7 +18,10 @@ export class RabbitMQQueueAdapter
   private readonly maxReconnectAttempts = 5;
 
   async onModuleInit() {
-    await this.connect();
+    // Inicia a conexão em background sem bloquear a inicialização da aplicação
+    this.connect().catch(error => {
+      console.log('RabbitMQ não conectado inicialmente, continuando tentativas em background...');
+    });
   }
 
   async onModuleDestroy() {

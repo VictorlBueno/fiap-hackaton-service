@@ -161,6 +161,58 @@ clean-images:
 	docker rmi $(PROJECT_NAME):$(IMAGE_TAG) $(PROJECT_NAME):dev 2>/dev/null || true
 	@echo "✅ Imagens removidas!"
 
+.PHONY: get-rabbitmq-credentials
+get-rabbitmq-credentials:
+	@echo "📋 Obtendo credenciais do RabbitMQ..."
+	aws secretsmanager get-secret-value --secret-id fiap-hack/rabbitmq-credentials --query SecretString --output text | jq -r '.amqp_url'
+
+.PHONY: get-rabbitmq-status
+get-rabbitmq-status:
+	@echo "📊 Status do RabbitMQ..."
+	@echo "Host: $(shell aws secretsmanager get-secret-value --secret-id fiap-hack/rabbitmq-credentials --query SecretString --output text | jq -r '.host')"
+	@echo "Porta AMQP: $(shell aws secretsmanager get-secret-value --secret-id fiap-hack/rabbitmq-credentials --query SecretString --output text | jq -r '.port')"
+	@echo "Porta Management: $(shell aws secretsmanager get-secret-value --secret-id fiap-hack/rabbitmq-credentials --query SecretString --output text | jq -r '.management_port')"
+	@echo "Management URL: $(shell aws secretsmanager get-secret-value --secret-id fiap-hack/rabbitmq-credentials --query SecretString --output text | jq -r '.management_url')"
+
+.PHONY: eks-create
+eks-create:
+	@echo "🚀 Criando cluster EKS..."
+	cd terraform && terraform apply -var-file="k8s.tfvars" -auto-approve -target=aws_eks_cluster.main -target=aws_eks_node_group.main
+	@echo "✅ Cluster EKS criado!"
+	@echo "📋 Configurando kubectl..."
+	aws eks update-kubeconfig --name fiap-hack-production --region us-east-1
+	@echo "✅ kubectl configurado!"
+
+.PHONY: eks-destroy
+eks-destroy:
+	@echo "🗑️ Destruindo cluster EKS..."
+	cd terraform && terraform destroy -var-file="k8s.tfvars" -auto-approve
+	@echo "✅ Cluster EKS destruído!"
+
+.PHONY: eks-status
+eks-status:
+	@echo "📊 Status do cluster EKS..."
+	aws eks describe-cluster --name fiap-hack-production --region us-east-1 --query 'cluster.{Name:name,Status:status,Version:version,Endpoint:endpoint}' --output table
+	@echo "✅ Status exibido!"
+
+.PHONY: get-service-url
+get-service-url:
+	@echo "🌐 Obtendo URL do serviço..."
+	@echo "⏳ Aguardando LoadBalancer ficar disponível..."
+	@kubectl wait --for=condition=Ready service/video-processor-service -n video-processor --timeout=300s
+	@echo "📋 URL do serviço:"
+	@kubectl get service video-processor-service -n video-processor -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "LoadBalancer ainda não disponível"
+	@echo ""
+	@echo "🔗 Para acessar o serviço:"
+	@echo "curl http://\$$(kubectl get service video-processor-service -n video-processor -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')/health"
+	@echo ""
+
+.PHONY: deploy-eks
+deploy-eks: eks-create push-ecr terraform-apply get-service-url
+	@echo "🚀 Deploy completo no EKS realizado!"
+	@echo "📊 Verificando status..."
+	@make k8s-status
+
 .PHONY: help
 help:
 	@echo "📚 Comandos disponíveis:"
@@ -193,13 +245,24 @@ help:
 	@echo ""
 	@echo "🚀 DEPLOY:"
 	@echo "  deploy             - Deploy completo (ECR + K8s)"
+	@echo "  deploy-eks         - Deploy completo no EKS (cria cluster + deploy)"
 	@echo "  deploy-ecr-only    - Apenas ECR"
 	@echo "  deploy-k8s-only    - Apenas Kubernetes"
+	@echo ""
+	@echo "☁️ EKS:"
+	@echo "  eks-create         - Criar cluster EKS"
+	@echo "  eks-destroy        - Destruir cluster EKS"
+	@echo "  eks-status         - Status do cluster EKS"
+	@echo "  get-service-url    - Obter URL do LoadBalancer"
 	@echo ""
 	@echo "🔧 DESENVOLVIMENTO:"
 	@echo "  dev-build          - Build para desenvolvimento"
 	@echo "  dev-run            - Executar em desenvolvimento"
 	@echo "  dev-stop           - Parar containers de desenvolvimento"
+	@echo ""
+	@echo "📋 RABBITMQ:"
+	@echo "  get-rabbitmq-credentials - Obter URL AMQP do RabbitMQ"
+	@echo "  get-rabbitmq-status      - Status do RabbitMQ"
 	@echo ""
 	@echo "🧹 LIMPEZA:"
 	@echo "  clean              - Limpar recursos Docker"

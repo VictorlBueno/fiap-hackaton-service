@@ -14,15 +14,12 @@ ecr/
 │   ├── outputs.tf      # Outputs do módulo
 │   ├── providers.tf    # Configuração de providers
 │   └── terraform.tfvars # Valores das variáveis
-├── k8s/                # Manifests Kubernetes
-│   ├── namespace.yaml  # Namespace da aplicação
-│   ├── configmap.yaml  # Configurações da aplicação
-│   ├── secret.yaml     # Secrets (credenciais)
-│   ├── deployment.yaml # Deployment da aplicação
-│   ├── service.yaml    # Service interno
-│   ├── ingress.yaml    # Ingress para acesso externo
-│   ├── hpa.yaml        # Auto-scaling
-│   └── kustomization.yaml # Gerenciamento de recursos
+├── terraform/          # Configurações Terraform
+│   ├── main.tf         # Recursos principais
+│   ├── variables.tf    # Definição de variáveis
+│   ├── outputs.tf      # Outputs do módulo
+│   ├── providers.tf    # Configuração de providers
+│   └── k8s.tfvars      # Valores das variáveis
 ├── scripts/            # Scripts de automação
 │   └── generate-secret.sh # Geração de secrets a partir do .env
 ├── src/                # Código fonte da aplicação
@@ -121,29 +118,28 @@ make deploy-infra
 ### Deploy no Kubernetes
 Para fazer deploy completo no Kubernetes:
 ```bash
-make k8s-deploy
+make deploy
 ```
 
 Este comando irá:
 1. ✅ Verificar kubectl e cluster
-2. 🔐 Gerar secrets a partir do arquivo `.env`
-3. 📋 Aplicar todos os recursos Kubernetes
+2. 🔐 Buscar credenciais do Secrets Manager
+3. 📋 Aplicar todos os recursos Kubernetes via Terraform
 4. 📊 Verificar status do deploy
 
-**⚠️ Importante:** Certifique-se de que o arquivo `.env` está configurado antes de executar o deploy.
+**⚠️ Importante:** Certifique-se de que o RabbitMQ e Database estão funcionando antes de executar o deploy.
 
 ### Comandos Kubernetes Disponíveis
 
 #### **Deploy e Gerenciamento:**
-- `k8s-apply` - Aplicar recursos Kubernetes
-- `k8s-delete` - Remover recursos Kubernetes
-- `k8s-deploy` - Deploy completo no Kubernetes
-- `k8s-update-secrets` - Atualizar secrets
+- `terraform-apply` - Aplicar recursos Terraform
+- `terraform-destroy` - Remover recursos Terraform
+- `deploy` - Deploy completo (ECR + Kubernetes)
+- `deploy-k8s-only` - Apenas Kubernetes
 
 #### **Monitoramento:**
 - `k8s-status` - Verificar status dos recursos
 - `k8s-logs` - Ver logs dos pods
-- `k8s-logs-pod` - Ver logs de pod específico
 - `k8s-describe` - Descrever recursos
 
 #### **Operações:**
@@ -151,7 +147,6 @@ Este comando irá:
 - `k8s-restart` - Reiniciar deployment
 - `k8s-rollback` - Fazer rollback
 - `k8s-port-forward` - Port-forward para service
-- `k8s-exec` - Executar comando em pod
 
 ### Recursos Kubernetes
 
@@ -184,7 +179,7 @@ O arquivo `.env` deve conter as configurações dos outros projetos:
 #### Configuração do .env:
 1. Copie o arquivo de exemplo: `cp env.example .env`
 2. Edite o arquivo `.env` com suas configurações
-3. Execute: `make k8s-update-secrets` para gerar o secret Kubernetes
+3. Execute: `make deploy` para fazer deploy completo
 
 ### Pré-requisitos para Deploy
 - AWS CLI configurado
@@ -587,7 +582,7 @@ make clean-images
    ```bash
    make terraform-plan
    make terraform-apply
-   ```
+```
 
 ### Logs e Debug
 

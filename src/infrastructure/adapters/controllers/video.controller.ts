@@ -112,6 +112,15 @@ export class VideoController {
     }
   }
 
+  @Get('health')
+  async health() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    };
+  }
+
   @Get('api/status')
   @GetStatusSwagger()
   async getStatus(@Req() req: AuthenticatedRequest) {
