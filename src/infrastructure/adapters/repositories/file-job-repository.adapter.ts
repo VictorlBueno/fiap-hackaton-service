@@ -4,7 +4,6 @@ import {
   JobStatus,
   ProcessingJob,
 } from '../../../domain/entities/processing-job.entity';
-import { ProcessedFile } from '../../../domain/entities/processed-file.entity';
 import { createDatabasePool } from '../../config/database.config';
 import { JobRepositoryPort } from '../../../domain/ports/repositories/job-repository.port';
 
@@ -20,13 +19,12 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
     const query = `
       INSERT INTO processing_jobs (
         id, user_id, video_name, video_path, status, message, 
-        frame_count, zip_path, zip_filename, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        frame_count, zip_filename, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       ON CONFLICT (id) DO UPDATE SET
         status = EXCLUDED.status,
         message = EXCLUDED.message,
         frame_count = EXCLUDED.frame_count,
-        zip_path = EXCLUDED.zip_path,
         zip_filename = EXCLUDED.zip_filename,
         updated_at = NOW()
     `;
@@ -39,7 +37,6 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
       job.status,
       job.message,
       job.frameCount || null,
-      job.zipPath || null,
       job.zipPath || null,
       job.createdAt,
     ];
@@ -87,57 +84,7 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
     }
   }
 
-  async getProcessedFilesByUser(userId: string): Promise<ProcessedFile[]> {
-    const query = `
-      SELECT zip_filename, created_at
-      FROM processing_jobs 
-      WHERE user_id = $1 AND status = 'completed' AND zip_filename IS NOT NULL
-      ORDER BY created_at DESC
-    `;
 
-    try {
-      const result = await this.pool.query(query, [userId]);
-
-      const files: ProcessedFile[] = [];
-
-      for (const row of result.rows) {
-        if (row.zip_filename) {
-          try {
-            const fs = await import('fs/promises');
-            const path = await import('path');
-            const filePath = path.join('outputs', row.zip_filename);
-            const stats = await fs.stat(filePath);
-
-            files.push(
-              new ProcessedFile(
-                row.zip_filename,
-                stats.size,
-                stats.mtime,
-                `/download/${row.zip_filename}`,
-              ),
-            );
-          } catch (fsError) {
-            files.push(
-              new ProcessedFile(
-                row.zip_filename,
-                0,
-                row.created_at,
-                `/download/${row.zip_filename}`,
-              ),
-            );
-          }
-        }
-      }
-
-      console.log(
-        `Listados ${files.length} arquivos do PostgreSQL para usuário ${userId}`,
-      );
-      return files;
-    } catch (error) {
-      console.error('Erro ao listar arquivos do PostgreSQL:', error.message);
-      return [];
-    }
-  }
 
   async updateJobStatus(
     id: string,
@@ -176,6 +123,7 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
       console.log(`Caminho do vídeo atualizado: ${id} -> ${videoPath}`);
     } catch (error) {
       console.error('Erro ao atualizar caminho do vídeo:', error.message);
+      throw error;
     }
   }
 

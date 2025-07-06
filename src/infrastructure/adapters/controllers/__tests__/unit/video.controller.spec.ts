@@ -1,430 +1,335 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import {VideoController} from "../../video.controller";
-import {UploadVideoUseCase} from "../../../../../application/usecases/upload-video.usecase";
-import {GetJobStatusUseCase} from "../../../../../application/usecases/get-job-status.usecase";
-import {ListAllJobsUseCase} from "../../../../../application/usecases/list-all-job-usecase";
-import {ProcessingJob} from "../../../../../domain/entities/processing-job.entity";
-import {AuthenticatedRequest} from "../../../../middleware/jwt-auth.middleware";
-
-jest.mock('fs/promises');
-jest.mock('path');
-jest.mock('multer', () => ({
-    diskStorage: jest.fn(() => ({})),
-}));
-
-jest.mock('@nestjs/platform-express', () => ({
-    FileInterceptor: jest.fn().mockImplementation(() => {
-        return jest.fn();
-    }),
-}));
-
-const mockFs = fs as jest.Mocked<typeof fs>;
-const mockPath = path as jest.Mocked<typeof path>;
+import { VideoController } from '../../video.controller';
+import { UploadVideoUseCase } from '../../../../../application/usecases/upload-video.usecase';
+import { GetJobStatusUseCase } from '../../../../../application/usecases/get-job-status.usecase';
+import { ListAllJobsUseCase } from '../../../../../application/usecases/list-all-job-usecase';
+import { FileStoragePort } from '../../../../../domain/ports/gateways/file-storage.port';
+import { AuthenticatedRequest } from '../../../../middleware/jwt-auth.middleware';
+import { ProcessingJob } from '../../../../../domain/entities/processing-job.entity';
+import { Readable } from 'stream';
 
 describe('VideoController - Unit Tests', () => {
-    let controller: VideoController;
-    let uploadVideoUseCase: jest.Mocked<UploadVideoUseCase>;
-    let getJobStatusUseCase: jest.Mocked<GetJobStatusUseCase>;
-    let listAllJobsUseCase: jest.Mocked<ListAllJobsUseCase>;
+  let controller: VideoController;
+  let mockUploadVideoUseCase: jest.Mocked<UploadVideoUseCase>;
+  let mockGetJobStatusUseCase: jest.Mocked<GetJobStatusUseCase>;
+  let mockListAllJobsUseCase: jest.Mocked<ListAllJobsUseCase>;
+  let mockFileStorage: jest.Mocked<FileStoragePort>;
+  let mockResponse: jest.Mocked<Response>;
 
-    const mockFile: Express.Multer.File = {
-        fieldname: 'video',
-        originalname: 'test.mp4',
-        encoding: '7bit',
-        mimetype: 'video/mp4',
-        buffer: Buffer.from('test'),
-        size: 1000,
-        destination: 'uploads',
-        filename: 'test.mp4',
-        path: '/uploads/test.mp4',
-        stream: null as any,
-    };
+  const mockAuthenticatedRequest: AuthenticatedRequest = {
+    userId: 'user-123',
+    userEmail: 'test@example.com',
+  } as AuthenticatedRequest;
 
-    const mockRequest: AuthenticatedRequest = {
-        userId: 'user-123',
-    } as AuthenticatedRequest;
+  const mockFile: Express.Multer.File = {
+    fieldname: 'video',
+    originalname: 'test-video.mp4',
+    encoding: '7bit',
+    mimetype: 'video/mp4',
+    size: 1024,
+    destination: 'uploads',
+    filename: '2024-01-01T00-00-00-000Z_test-video.mp4',
+    path: 'uploads/2024-01-01T00-00-00-000Z_test-video.mp4',
+    buffer: Buffer.from('test'),
+    stream: new Readable(),
+  };
 
-    const mockResponse = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn().mockReturnThis(),
-        setHeader: jest.fn().mockReturnThis(),
-        sendFile: jest.fn().mockReturnThis(),
-    } as any as jest.Mocked<Response>;
+  const mockJob: ProcessingJob = new ProcessingJob(
+    'job-123',
+    'video.mp4',
+    'completed' as any,
+    'Processamento concluído! 100 frames extraídos.',
+    'user-123',
+    100,
+    '/outputs/job-123.zip',
+    new Date(),
+    new Date(),
+  );
 
-    beforeEach(async () => {
-        const mockUploadVideoUseCase = {
-          execute: jest.fn(),
-        } as unknown as jest.Mocked<UploadVideoUseCase>;
+  beforeEach(async () => {
+    mockUploadVideoUseCase = {
+      execute: jest.fn(),
+    } as any;
 
-        const mockGetJobStatusUseCase = {
-          execute: jest.fn(),
-        } as unknown as jest.Mocked<GetJobStatusUseCase>;
+    mockGetJobStatusUseCase = {
+      execute: jest.fn(),
+    } as any;
 
-        const mockListAllJobsUseCase = {
-          execute: jest.fn(),
-        } as unknown as jest.Mocked<ListAllJobsUseCase>;
+    mockListAllJobsUseCase = {
+      execute: jest.fn(),
+    } as any;
 
-        const module: TestingModule = await Test.createTestingModule({
-            controllers: [VideoController],
-            providers: [
-                { provide: UploadVideoUseCase, useValue: mockUploadVideoUseCase },
-                { provide: GetJobStatusUseCase, useValue: mockGetJobStatusUseCase },
-                { provide: ListAllJobsUseCase, useValue: mockListAllJobsUseCase },
-            ],
-        }).compile();
+    mockFileStorage = {
+      getFileStream: jest.fn(),
+    } as any;
 
-        controller = module.get<VideoController>(VideoController);
-        uploadVideoUseCase = module.get(UploadVideoUseCase);
-        getJobStatusUseCase = module.get(GetJobStatusUseCase);
-        listAllJobsUseCase = module.get(ListAllJobsUseCase);
+    mockResponse = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      setHeader: jest.fn().mockReturnThis(),
+      pipe: jest.fn().mockReturnThis(),
+    } as any;
 
-        jest.clearAllMocks();
-        mockPath.join.mockImplementation((...paths) => paths.join('/'));
-        mockPath.resolve.mockImplementation((filePath) => `/absolute/${filePath}`);
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [VideoController],
+      providers: [
+        {
+          provide: UploadVideoUseCase,
+          useValue: mockUploadVideoUseCase,
+        },
+        {
+          provide: GetJobStatusUseCase,
+          useValue: mockGetJobStatusUseCase,
+        },
+        {
+          provide: ListAllJobsUseCase,
+          useValue: mockListAllJobsUseCase,
+        },
+        {
+          provide: 'FileStoragePort',
+          useValue: mockFileStorage,
+        },
+      ],
+    }).compile();
+
+    controller = module.get<VideoController>(VideoController);
+  });
+
+  describe('Given VideoController', () => {
+    describe('When uploading video successfully', () => {
+      beforeEach(() => {
+        mockUploadVideoUseCase.execute.mockResolvedValue({
+          success: true,
+          message: 'Upload realizado com sucesso',
+          jobId: 'job-123',
+        });
+      });
+
+      it('Then should return success response', async () => {
+        const result = await controller.uploadVideo(mockFile, mockAuthenticatedRequest);
+
+        expect(result).toEqual({
+          success: true,
+          message: 'Upload realizado com sucesso',
+          jobId: 'job-123',
+        });
+        expect(mockUploadVideoUseCase.execute).toHaveBeenCalledWith(
+          mockFile,
+          'user-123',
+          'test@example.com'
+        );
+      });
     });
 
-    describe('Given VideoController upload endpoint', () => {
-        describe('When uploading video successfully', () => {
-            const successResponse = {
-                success: true,
-                message: 'Upload realizado com sucesso',
-                jobId: 'job-123',
-                statusUrl: '/api/job/job-123',
-            };
+    describe('When upload fails', () => {
+      const uploadError = new Error('Upload failed');
 
-            beforeEach(() => {
-                uploadVideoUseCase.execute.mockResolvedValue(successResponse);
-            });
+      beforeEach(() => {
+        mockUploadVideoUseCase.execute.mockRejectedValue(uploadError);
+      });
 
-            it('Then should return success response', async () => {
-                const result = await controller.uploadVideo(mockFile, mockRequest);
+      it('Then should return error response', async () => {
+        const result = await controller.uploadVideo(mockFile, mockAuthenticatedRequest);
 
-                expect(result).toBe(successResponse);
-                expect(uploadVideoUseCase.execute).toHaveBeenCalledWith(mockFile, 'user-123');
-            });
+        expect(result).toEqual({
+          success: false,
+          message: 'Erro interno: Upload failed',
         });
-
-        describe('When upload fails', () => {
-            const errorResponse = {
-                success: false,
-                message: 'Formato não suportado',
-            };
-
-            beforeEach(() => {
-                uploadVideoUseCase.execute.mockResolvedValue(errorResponse);
-            });
-
-            it('Then should return error response', async () => {
-                const result = await controller.uploadVideo(mockFile, mockRequest);
-
-                expect(result).toBe(errorResponse);
-                expect(uploadVideoUseCase.execute).toHaveBeenCalledTimes(1);
-            });
-        });
-
-        describe('When use case throws exception', () => {
-            const useCaseError = new Error('Database connection failed');
-
-            beforeEach(() => {
-                uploadVideoUseCase.execute.mockRejectedValue(useCaseError);
-            });
-
-            it('Then should return internal error response', async () => {
-                const result = await controller.uploadVideo(mockFile, mockRequest);
-
-                expect(result.success).toBe(false);
-                expect(result.message).toBe('Erro interno: Database connection failed');
-            });
-        });
+        expect(mockUploadVideoUseCase.execute).toHaveBeenCalled();
+      });
     });
 
-    describe('Given VideoController job status endpoint', () => {
-        const mockJob = ProcessingJob.createCompleted('job-123', 'video.mp4', 'user-123', 150, 'frames.zip');
-
-        describe('When job exists and belongs to user', () => {
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(mockJob);
-            });
-
-            it('Then should return job details', async () => {
-                const result = await controller.getJobStatus('job-123', mockRequest);
-
-                expect(result).toBe(mockJob);
-                expect(getJobStatusUseCase.execute).toHaveBeenCalledWith('job-123', 'user-123');
-            });
+    describe('When getting job status', () => {
+      describe('When job exists and belongs to user', () => {
+        beforeEach(() => {
+          mockGetJobStatusUseCase.execute.mockResolvedValue(mockJob);
         });
 
-        describe('When job does not exist', () => {
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(null);
-            });
+        it('Then should return job data', async () => {
+          const result = await controller.getJobStatus('job-123', mockAuthenticatedRequest);
 
-            it('Then should return error message', async () => {
-                const result = await controller.getJobStatus('nonexistent', mockRequest);
+          expect(result).toEqual(mockJob);
+          expect(mockGetJobStatusUseCase.execute).toHaveBeenCalledWith('job-123', 'user-123');
+        });
+      });
 
-                expect(result).toEqual({
-                    error: 'Job não encontrado ou não pertence ao usuário',
-                });
-            });
+      describe('When job does not exist or does not belong to user', () => {
+        beforeEach(() => {
+          mockGetJobStatusUseCase.execute.mockResolvedValue(null);
         });
 
-        describe('When job belongs to different user', () => {
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(null);
-            });
+        it('Then should return error message', async () => {
+          const result = await controller.getJobStatus('job-123', mockAuthenticatedRequest);
 
-            it('Then should return error message', async () => {
-                const result = await controller.getJobStatus('job-123', mockRequest);
-
-                expect(result).toEqual({
-                    error: 'Job não encontrado ou não pertence ao usuário',
-                });
-            });
+          expect(result).toEqual({
+            error: 'Job não encontrado ou não pertence ao usuário',
+          });
+          expect(mockGetJobStatusUseCase.execute).toHaveBeenCalledWith('job-123', 'user-123');
         });
+      });
     });
 
-    describe('Given VideoController download endpoint', () => {
-        const completedJob = ProcessingJob.createCompleted('job-123', 'video.mp4', 'user-123', 150, 'job-123.zip');
+    describe('When downloading file', () => {
+      const mockFileStream = new Readable();
 
-        describe('When downloading valid completed job file', () => {
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(completedJob);
-                mockFs.access.mockResolvedValue(undefined);
-            });
+      beforeEach(() => {
+        mockFileStream._read = () => {};
+        mockFileStream.pipe = jest.fn().mockReturnThis();
+        mockGetJobStatusUseCase.execute.mockResolvedValue(mockJob);
+        mockFileStorage.getFileStream.mockResolvedValue(mockFileStream);
+      });
 
-            it('Then should send file with correct headers', async () => {
-                await controller.downloadFile('job-123.zip', mockResponse, mockRequest);
+      describe('When job exists and is completed', () => {
+        it('Then should stream file to response', async () => {
+          await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
-                expect(getJobStatusUseCase.execute).toHaveBeenCalledWith('job-123', 'user-123');
-                expect(mockFs.access).toHaveBeenCalledWith('outputs/job-123.zip');
-                expect(mockResponse.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename=job-123.zip');
-                expect(mockResponse.setHeader).toHaveBeenCalledWith('Content-Type', 'application/zip');
-                expect(mockResponse.sendFile).toHaveBeenCalledWith('/absolute/outputs/job-123.zip');
-            });
+          expect(mockGetJobStatusUseCase.execute).toHaveBeenCalledWith('job-123', 'user-123');
+          expect(mockFileStorage.getFileStream).toHaveBeenCalledWith('outputs/job-123.zip');
+          expect(mockResponse.setHeader).toHaveBeenCalledWith('Content-Type', 'application/zip');
+          expect(mockResponse.setHeader).toHaveBeenCalledWith(
+            'Content-Disposition',
+            'attachment; filename="job-123.zip"'
+          );
+          expect(mockFileStream.pipe).toHaveBeenCalledWith(mockResponse);
+        });
+      });
+
+      describe('When job does not exist', () => {
+        beforeEach(() => {
+          mockGetJobStatusUseCase.execute.mockResolvedValue(null);
         });
 
-        describe('When job does not exist', () => {
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(null);
-            });
+        it('Then should return forbidden error', async () => {
+          await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
-            it('Then should return forbidden status', async () => {
-                await controller.downloadFile('job-123.zip', mockResponse, mockRequest);
+          expect(mockResponse.status).toHaveBeenCalledWith(403);
+          expect(mockResponse.json).toHaveBeenCalledWith({
+            error: 'Arquivo não encontrado ou não pertence ao usuário',
+          });
+        });
+      });
 
-                expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.FORBIDDEN);
-                expect(mockResponse.json).toHaveBeenCalledWith({
-                    error: 'Arquivo não encontrado ou não pertence ao usuário',
-                });
-            });
+      describe('When job is not completed', () => {
+        beforeEach(() => {
+          const pendingJob = new ProcessingJob(
+            'job-123',
+            'video.mp4',
+            'pending' as any,
+            'Vídeo adicionado à fila de processamento',
+            'user-123',
+            undefined,
+            undefined,
+            new Date(),
+            new Date(),
+          );
+          mockGetJobStatusUseCase.execute.mockResolvedValue(pendingJob);
         });
 
-        describe('When job is not completed', () => {
-            const pendingJob = ProcessingJob.createPending('job-456', 'video.mp4', 'user-123');
+        it('Then should return forbidden error', async () => {
+          await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(pendingJob);
-            });
+          expect(mockResponse.status).toHaveBeenCalledWith(403);
+          expect(mockResponse.json).toHaveBeenCalledWith({
+            error: 'Arquivo não encontrado ou não pertence ao usuário',
+          });
+        });
+      });
 
-            it('Then should return forbidden status', async () => {
-                await controller.downloadFile('job-456.zip', mockResponse, mockRequest);
+      describe('When file storage fails', () => {
+        const storageError = new Error('S3 error');
 
-                expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.FORBIDDEN);
-                expect(mockResponse.json).toHaveBeenCalledWith({
-                    error: 'Arquivo não encontrado ou não pertence ao usuário',
-                });
-            });
+        beforeEach(() => {
+          mockFileStorage.getFileStream.mockRejectedValue(storageError);
         });
 
-        describe('When file does not exist physically', () => {
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(completedJob);
-                mockFs.access.mockRejectedValue(new Error('File not found'));
-            });
+        it('Then should return not found error', async () => {
+          await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
-            it('Then should return not found status', async () => {
-                await controller.downloadFile('job-123.zip', mockResponse, mockRequest);
-
-                expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
-                expect(mockResponse.json).toHaveBeenCalledWith({
-                    error: 'Arquivo físico não encontrado',
-                });
-            });
+          expect(mockResponse.status).toHaveBeenCalledWith(404);
+          expect(mockResponse.json).toHaveBeenCalledWith({
+            error: 'Erro ao baixar arquivo do S3',
+          });
         });
-
-        describe('When job belongs to different user', () => {
-            const otherUserJob = ProcessingJob.createCompleted('job-123', 'video.mp4', 'other-user', 150, 'job-123.zip');
-
-            beforeEach(() => {
-                getJobStatusUseCase.execute.mockResolvedValue(null);
-            });
-
-            it('Then should return forbidden status', async () => {
-                await controller.downloadFile('job-123.zip', mockResponse, mockRequest);
-
-                expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.FORBIDDEN);
-            });
-        });
+      });
     });
 
-    describe('Given VideoController status endpoint', () => {
-        const mockJobs = [
-            ProcessingJob.createCompleted('job-1', 'video1.mp4', 'user-123', 100, 'frames1.zip'),
-            ProcessingJob.createPending('job-2', 'video2.mp4', 'user-123'),
-            ProcessingJob.createFailed('job-3', 'video3.mp4', 'user-123', 'Error'),
-            {
-                id: 'job-4',
-                videoName: 'video4.mp4',
-                status: 'processing',
-                message: 'Processing...',
-                userId: 'user-123',
-                frameCount: 50,
-                zipPath: null,
-                createdAt: new Date(),
+    describe('When getting status', () => {
+      const mockJobs = [
+        new ProcessingJob(
+          'job-1',
+          'video1.mp4',
+          'completed' as any,
+          'Processamento concluído! 100 frames extraídos.',
+          'user-123',
+          100,
+          '/outputs/job-1.zip',
+          new Date(),
+          new Date(),
+        ),
+        new ProcessingJob(
+          'job-2',
+          'video2.mp4',
+          'pending' as any,
+          'Vídeo adicionado à fila de processamento',
+          'user-123',
+          undefined,
+          undefined,
+          new Date(),
+          new Date(),
+        ),
+      ];
+
+      describe('When jobs are retrieved successfully', () => {
+        beforeEach(() => {
+          mockListAllJobsUseCase.execute.mockResolvedValue(mockJobs);
+        });
+
+        it('Then should return formatted jobs with summary', async () => {
+          const result = await controller.getStatus(mockAuthenticatedRequest);
+
+          expect(result).toEqual({
+            jobs: expect.any(Array),
+            summary: {
+              total: 2,
+              pending: 1,
+              processing: 0,
+              completed: 1,
+              failed: 0,
+              totalFrames: 100,
             },
-        ];
+            userId: 'user-123',
+          });
+          expect(mockListAllJobsUseCase.execute).toHaveBeenCalledWith('user-123');
+        });
+      });
 
-        describe('When getting status successfully', () => {
-            beforeEach(() => {
-                listAllJobsUseCase.execute.mockResolvedValue(mockJobs as any);
-            });
+      describe('When listing jobs fails', () => {
+        const listError = new Error('Database error');
 
-            it('Then should return formatted jobs with summary', async () => {
-                const result = await controller.getStatus(mockRequest);
-
-                expect(listAllJobsUseCase.execute).toHaveBeenCalledWith('user-123');
-                expect(result.userId).toBe('user-123');
-                expect(result.jobs).toBeDefined();
-                expect(result.summary).toEqual({
-                    total: 4,
-                    pending: 1,
-                    processing: 1,
-                    completed: 1,
-                    failed: 1,
-                    totalFrames: 150,
-                });
-            });
-
-            it('Then should format jobs correctly', async () => {
-                const result = await controller.getStatus(mockRequest);
-
-                expect(result.jobs).toHaveLength(4);
-                expect(result.jobs[0]).toHaveProperty('downloadUrl');
-                expect(result.jobs[0]).toHaveProperty('canDownload');
-                expect(result.jobs[0]).toHaveProperty('duration');
-            });
+        beforeEach(() => {
+          mockListAllJobsUseCase.execute.mockRejectedValue(listError);
         });
 
-        describe('When listing jobs fails', () => {
-            beforeEach(() => {
-                listAllJobsUseCase.execute.mockRejectedValue(new Error('Database error'));
-            });
+        it('Then should return error response', async () => {
+          const result = await controller.getStatus(mockAuthenticatedRequest);
 
-            it('Then should return error response with empty data', async () => {
-                const result: any = await controller.getStatus(mockRequest);
-
-                expect(result.error).toBe('Erro ao listar jobs');
-                expect(result.jobs).toEqual([]);
-                expect(result.summary).toEqual({
-                    total: 0,
-                    pending: 0,
-                    processing: 0,
-                    completed: 0,
-                    failed: 0,
-                    totalFrames: 0,
-                });
-                expect(result.userId).toBe('user-123');
-            });
+          expect(result).toEqual({
+            error: 'Erro ao listar jobs',
+            jobs: [],
+            summary: {
+              total: 0,
+              pending: 0,
+              processing: 0,
+              completed: 0,
+              failed: 0,
+              totalFrames: 0,
+            },
+            userId: 'user-123',
+          });
+          expect(mockListAllJobsUseCase.execute).toHaveBeenCalledWith('user-123');
         });
-
-        describe('When user has no jobs', () => {
-            beforeEach(() => {
-                listAllJobsUseCase.execute.mockResolvedValue([]);
-            });
-
-            it('Then should return empty summary', async () => {
-                const result = await controller.getStatus(mockRequest);
-
-                expect(result.summary).toEqual({
-                    total: 0,
-                    pending: 0,
-                    processing: 0,
-                    completed: 0,
-                    failed: 0,
-                    totalFrames: 0,
-                });
-                expect(result.jobs).toEqual([]);
-            });
-        });
+      });
     });
-
-    describe('Given VideoController private methods', () => {
-        const testJobs = [
-            { status: 'completed', frameCount: 100 },
-            { status: 'pending', frameCount: null },
-            { status: 'processing', frameCount: 50 },
-            { status: 'failed', frameCount: null },
-            { status: 'completed', frameCount: 200 },
-        ];
-
-        describe('When calculating summary', () => {
-            it('Then should count each status correctly', () => {
-                const summary = controller['calculateSummary'](testJobs);
-
-                expect(summary.total).toBe(5);
-                expect(summary.completed).toBe(2);
-                expect(summary.pending).toBe(1);
-                expect(summary.processing).toBe(1);
-                expect(summary.failed).toBe(1);
-                expect(summary.totalFrames).toBe(350);
-            });
-        });
-
-        describe('When getting error response', () => {
-            it('Then should return standardized error format', () => {
-                const errorResponse = controller['getErrorResponse']('user-456');
-
-                expect(errorResponse).toEqual({
-                    error: 'Erro ao listar jobs',
-                    jobs: [],
-                    summary: {
-                        total: 0,
-                        pending: 0,
-                        processing: 0,
-                        completed: 0,
-                        failed: 0,
-                        totalFrames: 0,
-                    },
-                    userId: 'user-456',
-                });
-            });
-        });
-    });
-
-    describe('Given VideoController filename handling', () => {
-        describe('When extracting job ID from filename', () => {
-            it('Then should remove .zip extension correctly', async () => {
-                const completedJob = ProcessingJob.createCompleted('my-job-id', 'video.mp4', 'user-123', 150, 'my-job-id.zip');
-                getJobStatusUseCase.execute.mockResolvedValue(completedJob);
-                mockFs.access.mockResolvedValue(undefined);
-
-                await controller.downloadFile('my-job-id.zip', mockResponse, mockRequest);
-
-                expect(getJobStatusUseCase.execute).toHaveBeenCalledWith('my-job-id', 'user-123');
-            });
-
-            it('Then should handle complex job IDs', async () => {
-                const complexJob = ProcessingJob.createCompleted('2025-01-15T16-43-36-099Z', 'video.mp4', 'user-123', 150, '2025-01-15T16-43-36-099Z.zip');
-                getJobStatusUseCase.execute.mockResolvedValue(complexJob);
-                mockFs.access.mockResolvedValue(undefined);
-
-                await controller.downloadFile('2025-01-15T16-43-36-099Z.zip', mockResponse, mockRequest);
-
-                expect(getJobStatusUseCase.execute).toHaveBeenCalledWith('2025-01-15T16-43-36-099Z', 'user-123');
-            });
-        });
-    });
-});
+  });
+}); 

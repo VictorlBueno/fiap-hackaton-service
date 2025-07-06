@@ -1,33 +1,30 @@
 import { Pool } from 'pg';
-import { createDatabasePool, initDatabase } from '../../database.config';
+import { createDatabasePool } from '../../database.config';
 
 jest.mock('pg');
 
-describe('Database Pool Factory', () => {
-  const MockedPool = Pool as jest.MockedClass<typeof Pool>;
-  let originalEnv: NodeJS.ProcessEnv;
+const mockPool = Pool as jest.MockedClass<typeof Pool>;
 
+describe('Database Configuration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    originalEnv = { ...process.env };
+    delete process.env.DB_HOST;
+    delete process.env.DB_PORT;
+    delete process.env.DB_USERNAME;
+    delete process.env.DB_PASSWORD;
+    delete process.env.DB_NAME;
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-  });
+  describe('Given database configuration', () => {
+    describe('When creating database pool with default values', () => {
+      it('Then should create pool with default configuration', () => {
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
 
-  describe('Given database configuration requirements', () => {
-    describe('When creating a database pool with default configuration', () => {
-      it('Should instantiate Pool with correct default parameters', () => {
-        delete process.env.DB_HOST;
-        delete process.env.DB_PORT;
-        delete process.env.DB_USERNAME;
-        delete process.env.DB_PASSWORD;
-        delete process.env.DB_NAME;
+        const result = createDatabasePool();
 
-        createDatabasePool();
-
-        expect(MockedPool).toHaveBeenCalledWith({
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith({
           host: 'localhost',
           port: 5433,
           user: 'postgres',
@@ -40,22 +37,26 @@ describe('Database Pool Factory', () => {
       });
     });
 
-    describe('When creating a database pool with environment variables', () => {
-      it('Should use environment configuration over defaults', () => {
+    describe('When creating database pool with custom environment variables', () => {
+      it('Then should create pool with custom configuration', () => {
         process.env.DB_HOST = 'custom-host';
         process.env.DB_PORT = '5432';
         process.env.DB_USERNAME = 'custom-user';
-        process.env.DB_PASSWORD = 'custom-pass';
-        process.env.DB_NAME = 'custom-db';
+        process.env.DB_PASSWORD = 'custom-password';
+        process.env.DB_NAME = 'custom-database';
 
-        createDatabasePool();
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
 
-        expect(MockedPool).toHaveBeenCalledWith({
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith({
           host: 'custom-host',
           port: 5432,
           user: 'custom-user',
-          password: 'custom-pass',
-          database: 'custom-db',
+          password: 'custom-password',
+          database: 'custom-database',
           max: 20,
           idleTimeoutMillis: 30000,
           connectionTimeoutMillis: 2000,
@@ -63,133 +64,295 @@ describe('Database Pool Factory', () => {
       });
     });
 
-    describe('When DB_PORT is not a valid number', () => {
-      it('Should fallback to default port', () => {
-        process.env.DB_PORT = 'invalid';
+    describe('When creating database pool with partial environment variables', () => {
+      it('Then should use custom values where provided and defaults for others', () => {
+        process.env.DB_HOST = 'partial-host';
+        process.env.DB_USERNAME = 'partial-user';
 
-        createDatabasePool();
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
 
-        expect(MockedPool).toHaveBeenCalledWith(
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith({
+          host: 'partial-host',
+          port: 5433,
+          user: 'partial-user',
+          password: 'postgres123',
+          database: 'video_processor',
+          max: 20,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000,
+        });
+      });
+    });
+
+    describe('When creating database pool with invalid port', () => {
+      it('Then should use default port when port is invalid', () => {
+        process.env.DB_PORT = 'invalid-port';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
           expect.objectContaining({
             port: 5433,
-          }),
+          })
         );
+      });
+
+      it('Then should handle empty port string', () => {
+        process.env.DB_PORT = '';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            port: 5433,
+          })
+        );
+      });
+    });
+
+    describe('When creating database pool with empty environment variables', () => {
+      it('Then should use default values for empty environment variables', () => {
+        process.env.DB_HOST = '';
+        process.env.DB_PORT = '';
+        process.env.DB_USERNAME = '';
+        process.env.DB_PASSWORD = '';
+        process.env.DB_NAME = '';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith({
+          host: 'localhost',
+          port: 5433,
+          user: 'postgres',
+          password: 'postgres123',
+          database: 'video_processor',
+          max: 20,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000,
+        });
+      });
+    });
+
+    describe('When creating database pool with connection pool settings', () => {
+      it('Then should have correct connection pool configuration', () => {
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            max: 20,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 2000,
+          })
+        );
+      });
+    });
+
+    describe('When creating database pool with different port values', () => {
+      it('Then should handle valid port numbers', () => {
+        process.env.DB_PORT = '5432';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            port: 5432,
+          })
+        );
+      });
+
+      it('Then should handle port as string', () => {
+        process.env.DB_PORT = '5434';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            port: 5434,
+          })
+        );
+      });
+
+      it('Then should handle large port numbers', () => {
+        process.env.DB_PORT = '65535';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            port: 65535,
+          })
+        );
+      });
+    });
+
+    describe('When creating database pool with special characters in credentials', () => {
+      it('Then should handle special characters in username', () => {
+        process.env.DB_USERNAME = 'user@domain.com';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: 'user@domain.com',
+          })
+        );
+      });
+
+      it('Then should handle special characters in password', () => {
+        process.env.DB_PASSWORD = 'pass@word#123!';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            password: 'pass@word#123!',
+          })
+        );
+      });
+
+      it('Then should handle special characters in database name', () => {
+        process.env.DB_NAME = 'test-db_123';
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            database: 'test-db_123',
+          })
+        );
+      });
+    });
+
+    describe('When creating database pool with very long values', () => {
+      it('Then should handle very long host names', () => {
+        const longHost = 'a'.repeat(1000);
+        process.env.DB_HOST = longHost;
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            host: longHost,
+          })
+        );
+      });
+
+      it('Then should handle very long usernames', () => {
+        const longUser = 'b'.repeat(500);
+        process.env.DB_USERNAME = longUser;
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: longUser,
+          })
+        );
+      });
+
+      it('Then should handle very long passwords', () => {
+        const longPassword = 'c'.repeat(1000);
+        process.env.DB_PASSWORD = longPassword;
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            password: longPassword,
+          })
+        );
+      });
+
+      it('Then should handle very long database names', () => {
+        const longDatabase = 'd'.repeat(500);
+        process.env.DB_NAME = longDatabase;
+
+        const mockPoolInstance = {} as Pool;
+        mockPool.mockImplementation(() => mockPoolInstance);
+
+        const result = createDatabasePool();
+
+        expect(result).toBe(mockPoolInstance);
+        expect(mockPool).toHaveBeenCalledWith(
+          expect.objectContaining({
+            database: longDatabase,
+          })
+        );
+      });
+    });
+
+    describe('When creating multiple database pools', () => {
+      it('Then should create independent pool instances', () => {
+        const mockPoolInstance1 = {} as Pool;
+        const mockPoolInstance2 = {} as Pool;
+        mockPool
+          .mockImplementationOnce(() => mockPoolInstance1)
+          .mockImplementationOnce(() => mockPoolInstance2);
+
+        const result1 = createDatabasePool();
+        const result2 = createDatabasePool();
+
+        expect(result1).toBe(mockPoolInstance1);
+        expect(result2).toBe(mockPoolInstance2);
+        expect(result1).not.toBe(result2);
+        expect(mockPool).toHaveBeenCalledTimes(2);
       });
     });
   });
-
-  describe('Given database initialization requirements', () => {
-    let mockPool: jest.Mocked<Pool>;
-    let consoleLogSpy: jest.SpyInstance;
-
-    beforeEach(() => {
-      mockPool = {
-        query: jest.fn(),
-        end: jest.fn(),
-      } as any;
-      MockedPool.mockImplementation(() => mockPool);
-      consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-    });
-
-    afterEach(() => {
-      consoleLogSpy.mockRestore();
-    });
-
-    describe('When database initialization succeeds', () => {
-      it('Should execute all required database operations and log success', async () => {
-        // @ts-ignore
-        mockPool.query.mockResolvedValue({} as any);
-
-        await initDatabase();
-
-        expect(mockPool.query).toHaveBeenCalledTimes(3);
-        expect(mockPool.query).toHaveBeenNthCalledWith(
-          1,
-          expect.stringContaining('CREATE TABLE IF NOT EXISTS processing_jobs'),
-        );
-        expect(mockPool.query).toHaveBeenNthCalledWith(
-          2,
-          expect.stringContaining('CREATE INDEX IF NOT EXISTS'),
-        );
-        expect(mockPool.query).toHaveBeenNthCalledWith(
-          3,
-          expect.stringContaining('CREATE OR REPLACE FUNCTION'),
-        );
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '✅ Database initialized with processing_jobs table',
-        );
-        expect(mockPool.end).toHaveBeenCalled();
-      });
-    });
-
-    describe('When database initialization fails', () => {
-      it('Should log error message and close connection', async () => {
-        const errorMessage = 'Connection failed';
-        // @ts-ignore
-        mockPool.query.mockRejectedValue(new Error(errorMessage));
-
-        await initDatabase();
-
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '⚠️ Database initialization failed:',
-          errorMessage,
-        );
-        expect(mockPool.end).toHaveBeenCalled();
-      });
-    });
-
-    describe('When table creation succeeds but index creation fails', () => {
-      it('Should handle partial failure and close connection properly', async () => {
-        mockPool.query
-          // @ts-ignore
-          .mockResolvedValueOnce({} as any)
-          // @ts-ignore
-          .mockRejectedValueOnce(new Error('Index creation failed'));
-
-        await initDatabase();
-
-        expect(mockPool.query).toHaveBeenCalledTimes(2);
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '⚠️ Database initialization failed:',
-          'Index creation failed',
-        );
-        expect(mockPool.end).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Given proper resource management requirements', () => {
-    let mockPool: jest.Mocked<Pool>;
-
-    beforeEach(() => {
-      mockPool = {
-        query: jest.fn(),
-        end: jest.fn(),
-      } as any;
-      MockedPool.mockImplementation(() => mockPool);
-      jest.spyOn(console, 'log').mockImplementation();
-    });
-
-    describe('When database operations complete successfully', () => {
-      it('Should always close the connection pool', async () => {
-        // @ts-ignore
-        mockPool.query.mockResolvedValue({} as any);
-
-        await initDatabase();
-
-        expect(mockPool.end).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('When database operations throw an exception', () => {
-      it('Should ensure connection pool is closed in finally block', async () => {
-        // @ts-ignore
-        mockPool.query.mockRejectedValue(new Error('Database error'));
-
-        await initDatabase();
-
-        expect(mockPool.end).toHaveBeenCalledTimes(1);
-      });
-    });
-  });
-});
+}); 

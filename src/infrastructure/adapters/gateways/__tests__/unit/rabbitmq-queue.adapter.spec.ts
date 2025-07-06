@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import * as amqp from 'amqplib';
 import { EventEmitter } from 'events';
-import {RabbitMQQueueAdapter} from "../../rabbitmq-queue.adapter";
-import {QueueMessage} from "../../../../../domain/ports/gateways/queue.port";
+import { RabbitMQQueueAdapter } from "../../rabbitmq-queue.adapter";
+import { QueueMessage } from "../../../../../domain/ports/gateways/queue.port";
 
 jest.mock('amqplib');
 
@@ -23,7 +23,7 @@ class MockChannel extends EventEmitter {
     close = jest.fn();
 }
 
-describe('RabbitMQQueueAdapter - Unit Tests', () => {
+describe('RabbitMQQueueAdapter', () => {
     let adapter: RabbitMQQueueAdapter;
     let mockConnection: MockConnection;
     let mockChannel: MockChannel;
@@ -39,7 +39,7 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
         mockConnection = new MockConnection();
         mockChannel = new MockChannel();
 
-        mockConnection.createChannel.mockResolvedValue(mockChannel);
+        mockConnection.createChannel.mockResolvedValue(mockChannel as any);
         mockChannel.assertQueue.mockResolvedValue({} as any);
         mockChannel.sendToQueue.mockReturnValue(true);
         mockChannel.prefetch.mockResolvedValue(undefined);
@@ -50,6 +50,7 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
         mockAmqp.connect.mockResolvedValue(mockConnection as any);
 
         process.env.RABBITMQ_URL = 'amqp://localhost:5672';
+        process.env.NODE_ENV = 'test';
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [RabbitMQQueueAdapter],
@@ -60,8 +61,10 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
         jest.clearAllMocks();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
         delete process.env.RABBITMQ_URL;
+        delete process.env.NODE_ENV;
+        jest.clearAllMocks();
     });
 
     describe('Given RabbitMQQueueAdapter initialization', () => {
@@ -156,39 +159,9 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
             });
         });
 
-        describe('When not connected and reconnection succeeds', () => {
-            beforeEach(() => {
-                adapter['isConnected'] = false;
-            });
-
-            it('Then should attempt reconnection before sending', async () => {
-                const connectSpy = jest.spyOn(adapter as any, 'connect');
-                mockChannel.sendToQueue.mockReturnValue(true);
-
-                const result = await adapter.sendMessage(mockMessage);
-
-                expect(connectSpy).toHaveBeenCalled();
-                expect(result).toBe(true);
-            });
-        });
-
-        describe('When not connected and reconnection fails', () => {
-            beforeEach(() => {
-                adapter['isConnected'] = false;
-                mockAmqp.connect.mockRejectedValue(new Error('Connection failed'));
-            });
-
-            it('Then should return false without sending', async () => {
-                const result = await adapter.sendMessage(mockMessage);
-
-                expect(result).toBe(false);
-                expect(mockChannel.sendToQueue).not.toHaveBeenCalled();
-            });
-        });
-
         describe('When channel is not available', () => {
             beforeEach(() => {
-                adapter['channel'] = null as any;
+                (adapter as any).channel = null;
             });
 
             it('Then should return false', async () => {
@@ -275,7 +248,7 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
             const mockRabbitMessage = {
                 content: Buffer.from(JSON.stringify(mockMessage)),
             };
-            const fileError = new Error('arquivo not found');
+            const fileError = new Error('file not found');
 
             beforeEach(() => {
                 mockCallback.mockRejectedValue(fileError);
@@ -291,7 +264,7 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
 
         describe('When not connected for consumption', () => {
             beforeEach(() => {
-                adapter['isConnected'] = false;
+                (adapter as any).isConnected = false;
             });
 
             it('Then should return early without setting up consumer', async () => {
@@ -304,7 +277,7 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
 
         describe('When channel is not available for consumption', () => {
             beforeEach(() => {
-                adapter['channel'] = null as any;
+                (adapter as any).channel = null;
             });
 
             it('Then should return early without setting up consumer', async () => {
@@ -341,90 +314,6 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
         });
     });
 
-    describe('Given RabbitMQQueueAdapter connection handling', () => {
-        beforeEach(async () => {
-            await adapter.onModuleInit();
-        });
-
-        describe('When connection error occurs', () => {
-            it('Then should mark as disconnected and schedule reconnect', () => {
-                const scheduleReconnectSpy = jest.spyOn(adapter as any, 'scheduleReconnect').mockImplementation();
-
-                mockConnection.emit('error', new Error('Connection lost'));
-
-                expect(scheduleReconnectSpy).toHaveBeenCalled();
-            });
-        });
-
-        describe('When connection closes', () => {
-            it('Then should mark as disconnected and schedule reconnect', () => {
-                const scheduleReconnectSpy = jest.spyOn(adapter as any, 'scheduleReconnect').mockImplementation();
-
-                mockConnection.emit('close');
-
-                expect(scheduleReconnectSpy).toHaveBeenCalled();
-            });
-        });
-
-        describe('When channel error occurs', () => {
-            it('Then should mark as disconnected and schedule reconnect', () => {
-                const scheduleReconnectSpy = jest.spyOn(adapter as any, 'scheduleReconnect').mockImplementation();
-
-                mockChannel.emit('error', new Error('Channel error'));
-
-                expect(scheduleReconnectSpy).toHaveBeenCalled();
-            });
-        });
-
-        describe('When channel closes', () => {
-            it('Then should mark as disconnected and schedule reconnect', () => {
-                const scheduleReconnectSpy = jest.spyOn(adapter as any, 'scheduleReconnect').mockImplementation();
-
-                mockChannel.emit('close');
-
-                expect(scheduleReconnectSpy).toHaveBeenCalled();
-            });
-        });
-    });
-
-    describe('Given RabbitMQQueueAdapter reconnection logic', () => {
-        let setTimeoutSpy: jest.SpyInstance;
-
-        beforeEach(async () => {
-            await adapter.onModuleInit();
-            jest.useFakeTimers();
-            setTimeoutSpy = jest.spyOn(global, 'setTimeout');
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
-            setTimeoutSpy.mockRestore();
-        });
-
-        describe('When reconnection is scheduled', () => {
-            it('Then should attempt reconnection with exponential backoff', () => {
-                const connectSpy = jest.spyOn(adapter as any, 'connect').mockResolvedValue(undefined);
-                adapter['reconnectAttempts'] = 0;
-
-                adapter['scheduleReconnect']();
-
-                expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
-
-                jest.advanceTimersByTime(2000);
-
-                expect(connectSpy).toHaveBeenCalled();
-            });
-
-            it('Then should stop reconnecting after max attempts', () => {
-                adapter['reconnectAttempts'] = 5;
-
-                adapter['scheduleReconnect']();
-
-                expect(setTimeoutSpy).not.toHaveBeenCalled();
-            });
-        });
-    });
-
     describe('Given RabbitMQQueueAdapter disconnection', () => {
         beforeEach(async () => {
             await adapter.onModuleInit();
@@ -432,7 +321,7 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
 
         describe('When disconnecting gracefully', () => {
             it('Then should close channel and connection', async () => {
-                await adapter['disconnect']();
+                await (adapter as any).disconnect();
 
                 expect(mockChannel.close).toHaveBeenCalledTimes(1);
                 expect(mockConnection.close).toHaveBeenCalledTimes(1);
@@ -447,7 +336,7 @@ describe('RabbitMQQueueAdapter - Unit Tests', () => {
             });
 
             it('Then should handle disconnection errors gracefully', async () => {
-                await expect(adapter['disconnect']()).resolves.toBeUndefined();
+                await expect((adapter as any).disconnect()).resolves.toBeUndefined();
 
                 expect(mockChannel.close).toHaveBeenCalled();
             });

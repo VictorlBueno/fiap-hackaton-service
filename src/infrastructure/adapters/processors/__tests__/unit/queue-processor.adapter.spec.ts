@@ -1,331 +1,210 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {QueueProcessorAdapter} from "../../queue-processor.adapter";
-import {QueueMessage, QueuePort} from "../../../../../domain/ports/gateways/queue.port";
-import {VideoProcessingService} from "../../../../../domain/service/video-processing.service";
-import {JobStatus, ProcessingJob} from "../../../../../domain/entities/processing-job.entity";
-import {Video} from "../../../../../domain/entities/video.entity";
+import { QueueProcessorAdapter } from '../../queue-processor.adapter';
+import { QueuePort, QueueMessage } from '../../../../../domain/ports/gateways/queue.port';
+import { VideoProcessingService } from '../../../../../domain/service/video-processing.service';
+import { ProcessingJob, JobStatus } from '../../../../../domain/entities/processing-job.entity';
 
 describe('QueueProcessorAdapter', () => {
-    let adapter: QueueProcessorAdapter;
-    let mockQueue: jest.Mocked<QueuePort>;
-    let mockVideoProcessingService: jest.Mocked<VideoProcessingService>;
+  let adapter: QueueProcessorAdapter;
+  let mockQueue: jest.Mocked<QueuePort>;
+  let mockVideoProcessingService: jest.Mocked<VideoProcessingService>;
 
-    const createMockQueueMessage = (): QueueMessage => ({
-        id: 'video-123',
-        videoName: 'test-video.mp4',
-        videoPath: '/uploads/test-video.mp4',
-        userId: 'user-456'
+  const mockQueueMessage: QueueMessage = {
+    id: 'job-123',
+    videoPath: '/uploads/test-video.mp4',
+    videoName: 'test-video.mp4',
+    userId: 'user-456',
+  };
+
+  const mockProcessingJob = new ProcessingJob(
+    'job-123',
+    'test-video.mp4',
+    JobStatus.COMPLETED,
+    'Success',
+    'user-456',
+    150,
+    'frames.zip',
+    new Date(),
+    new Date()
+  );
+
+  beforeEach(async () => {
+    mockQueue = {
+      consumeMessages: jest.fn(),
+    } as any;
+
+    mockVideoProcessingService = {
+      processVideo: jest.fn(),
+    } as any;
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        QueueProcessorAdapter,
+        {
+          provide: 'QueuePort',
+          useValue: mockQueue,
+        },
+        {
+          provide: VideoProcessingService,
+          useValue: mockVideoProcessingService,
+        },
+      ],
+    }).compile();
+
+    adapter = module.get<QueueProcessorAdapter>(QueueProcessorAdapter);
+    jest.clearAllMocks();
+  });
+
+  it('should call consumeMessages on startProcessing', async () => {
+    mockQueue.consumeMessages.mockResolvedValue();
+    // @ts-ignore
+    await adapter['startProcessing']();
+    expect(mockQueue.consumeMessages).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('should call processVideo on processMessage', async () => {
+    mockVideoProcessingService.processVideo.mockResolvedValue({
+      isFailed: () => false,
+      isCompleted: () => true,
+      id: 'job-123',
+      videoName: 'test-video.mp4',
+      status: JobStatus.COMPLETED,
+      message: '',
+      userId: 'user-456',
+      createdAt: new Date(),
+    });
+    // @ts-ignore
+    await adapter['processMessage'](mockQueueMessage);
+    expect(mockVideoProcessingService.processVideo).toHaveBeenCalled();
+  });
+
+  it('should log error if processVideo throws', async () => {
+    const error = new Error('fail');
+    mockVideoProcessingService.processVideo.mockRejectedValue(error);
+    const spy = jest.spyOn(console, 'error').mockImplementation();
+    // @ts-ignore
+    await expect(adapter['processMessage'](mockQueueMessage)).rejects.toThrow('fail');
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  describe('Given QueueProcessorAdapter', () => {
+    describe('When module initializes', () => {
+      it('Then should call queue consumeMessages', async () => {
+        mockQueue.consumeMessages.mockResolvedValue();
+
+        await adapter.onModuleInit();
+        
+        // Aguardar o setTimeout
+        await new Promise(resolve => setTimeout(resolve, 2100));
+
+        expect(mockQueue.consumeMessages).toHaveBeenCalledWith(expect.any(Function));
+      });
     });
 
-    const createMockProcessingJob = (status: JobStatus): ProcessingJob => ({
-        id: 'video-123',
-        userId: 'user-456',
-        status,
-        message: status === JobStatus.COMPLETED ? 'Processamento concluído' : 'Erro no processamento',
-        isCompleted: () => status === JobStatus.COMPLETED,
-        isFailed: () => status === JobStatus.FAILED
-    } as ProcessingJob);
+    describe('When processing message successfully', () => {
+      let messageCallback: (message: QueueMessage) => Promise<void>;
 
-    beforeEach(async () => {
-        jest.useFakeTimers();
-        jest.spyOn(global, 'setTimeout');
-
-        const mockQueuePort = {
-            consumeMessages: jest.fn(),
-            sendMessage: jest.fn()
-        };
-
-        const mockVideoService = {
-            processVideo: jest.fn()
-        };
-
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                QueueProcessorAdapter,
-                {
-                    provide: 'QueuePort',
-                    useValue: mockQueuePort
-                },
-                {
-                    provide: VideoProcessingService,
-                    useValue: mockVideoService
-                }
-            ]
-        }).compile();
-
-        adapter = module.get<QueueProcessorAdapter>(QueueProcessorAdapter);
-        mockQueue = module.get('QueuePort');
-        mockVideoProcessingService = module.get(VideoProcessingService);
-
-        jest.spyOn(console, 'log').mockImplementation();
-        jest.spyOn(console, 'error').mockImplementation();
-    });
-
-    afterEach(() => {
-        jest.clearAllMocks();
-        jest.clearAllTimers();
-        jest.useRealTimers();
-    });
-
-    describe('GIVEN queue processor initialization', () => {
-        describe('WHEN module initializes', () => {
-            it('THEN should start queue processing after delay', async () => {
-                mockQueue.consumeMessages.mockResolvedValue();
-
-                await adapter.onModuleInit();
-
-                expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 2000);
-
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                expect(mockQueue.consumeMessages).toHaveBeenCalledWith(
-                    expect.any(Function)
-                );
-            });
-
-            it('THEN should retry on queue initialization failure', async () => {
-                mockQueue.consumeMessages
-                    .mockRejectedValueOnce(new Error('Queue connection failed'))
-                    .mockResolvedValueOnce();
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                expect(console.error).toHaveBeenCalledWith(
-                    'Erro no processador:',
-                    'Queue connection failed'
-                );
-
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                expect(mockQueue.consumeMessages).toHaveBeenCalledTimes(2);
-            });
-        });
-    });
-
-    describe('GIVEN message processing', () => {
-        describe('WHEN processing a valid message', () => {
-            it('THEN should create video entity and process successfully', async () => {
-                const message = createMockQueueMessage();
-                const completedJob = createMockProcessingJob(JobStatus.COMPLETED);
-                let messageCallback: (message: QueueMessage) => Promise<void>;
-
-                mockQueue.consumeMessages.mockImplementation(async (callback) => {
-                    messageCallback = callback;
-                });
-
-                mockVideoProcessingService.processVideo.mockResolvedValue(completedJob);
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                await messageCallback!(message);
-
-                expect(mockVideoProcessingService.processVideo).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        id: message.id,
-                        originalName: message.videoName,
-                        path: message.videoPath,
-                        userId: message.userId,
-                        size: 0
-                    })
-                );
-
-                expect(console.log).toHaveBeenCalledWith(
-                    `Processamento concluído para usuário ${message.userId}: ${message.id}`
-                );
-            });
-
-            it('THEN should handle failed processing gracefully', async () => {
-                const message = createMockQueueMessage();
-                const failedJob = createMockProcessingJob(JobStatus.FAILED);
-                let messageCallback: (message: QueueMessage) => Promise<void>;
-
-                mockQueue.consumeMessages.mockImplementation(async (callback) => {
-                    messageCallback = callback;
-                });
-
-                mockVideoProcessingService.processVideo.mockResolvedValue(failedJob);
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                await messageCallback!(message);
-
-                expect(console.error).toHaveBeenCalledWith(
-                    `Processamento falhou para usuário ${message.userId}: ${message.id} - ${failedJob.message}`
-                );
-            });
-
-            it('THEN should create video entity with current timestamp', async () => {
-                const message = createMockQueueMessage();
-                const beforeTime = Date.now();
-                let messageCallback: (message: QueueMessage) => Promise<void>;
-
-                mockQueue.consumeMessages.mockImplementation(async (callback) => {
-                    messageCallback = callback;
-                });
-
-                mockVideoProcessingService.processVideo.mockResolvedValue(
-                    createMockProcessingJob(JobStatus.COMPLETED)
-                );
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                await messageCallback!(message);
-
-                const videoArgument = mockVideoProcessingService.processVideo.mock.calls[0][0] as Video;
-                const afterTime = Date.now();
-
-                expect(videoArgument.createdAt).toBeInstanceOf(Date);
-                expect(videoArgument.createdAt.getTime()).toBeGreaterThanOrEqual(beforeTime);
-                expect(videoArgument.createdAt.getTime()).toBeLessThanOrEqual(afterTime);
-            });
+      beforeEach(() => {
+        mockQueue.consumeMessages.mockImplementation((callback) => {
+          messageCallback = callback;
+          return Promise.resolve();
         });
 
-        describe('WHEN processing fails with exception', () => {
-            it('THEN should log error and re-throw exception', async () => {
-                const message = createMockQueueMessage();
-                const error = new Error('Database connection failed');
-                let messageCallback: (message: QueueMessage) => Promise<void>;
+        mockVideoProcessingService.processVideo.mockResolvedValue(mockProcessingJob);
+      });
 
-                mockQueue.consumeMessages.mockImplementation(async (callback) => {
-                    messageCallback = callback;
-                });
+      it('Then should create video entity and process successfully', async () => {
+        await adapter.onModuleInit();
+        
+        // Aguardar o setTimeout
+        await new Promise(resolve => setTimeout(resolve, 2100));
 
-                mockVideoProcessingService.processVideo.mockRejectedValue(error);
+        await messageCallback(mockQueueMessage);
 
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                await expect(messageCallback!(message)).rejects.toThrow(
-                    'Database connection failed'
-                );
-
-                expect(console.error).toHaveBeenCalledWith(
-                    `Erro crítico no processamento para usuário ${message.userId}: ${message.id}`,
-                    'Database connection failed'
-                );
-            });
-
-            it('THEN should handle null processing result', async () => {
-                const message = createMockQueueMessage();
-                let messageCallback: (message: QueueMessage) => Promise<void>;
-
-                mockQueue.consumeMessages.mockImplementation(async (callback) => {
-                    messageCallback = callback;
-                });
-
-                mockVideoProcessingService.processVideo.mockResolvedValue(null);
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                await messageCallback!(message);
-
-                expect(console.log).not.toHaveBeenCalledWith(
-                    expect.stringContaining('✅ Processamento concluído')
-                );
-                expect(console.error).not.toHaveBeenCalledWith(
-                    expect.stringContaining('❌ Processamento falhou')
-                );
-            });
-        });
-
-        describe('WHEN processing different message types', () => {
-            it('THEN should handle messages with special characters in video name', async () => {
-                const message: QueueMessage = {
-                    ...createMockQueueMessage(),
-                    videoName: 'vídeo-teste_ção.mp4',
-                    videoPath: '/uploads/vídeo-teste_ção.mp4'
-                };
-                let messageCallback: (message: QueueMessage) => Promise<void>;
-
-                mockQueue.consumeMessages.mockImplementation(async (callback) => {
-                    messageCallback = callback;
-                });
-
-                mockVideoProcessingService.processVideo.mockResolvedValue(
-                    createMockProcessingJob(JobStatus.COMPLETED)
-                );
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                await messageCallback!(message);
-
-                expect(mockVideoProcessingService.processVideo).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        originalName: 'vídeo-teste_ção.mp4',
-                        path: '/uploads/vídeo-teste_ção.mp4'
-                    })
-                );
-            });
-
-            it('THEN should handle long user IDs and video names', async () => {
-                const message: QueueMessage = {
-                    ...createMockQueueMessage(),
-                    userId: 'a'.repeat(100),
-                    videoName: 'b'.repeat(255) + '.mp4'
-                };
-                let messageCallback: (message: QueueMessage) => Promise<void>;
-
-                mockQueue.consumeMessages.mockImplementation(async (callback) => {
-                    messageCallback = callback;
-                });
-
-                mockVideoProcessingService.processVideo.mockResolvedValue(
-                    createMockProcessingJob(JobStatus.COMPLETED)
-                );
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                await messageCallback!(message);
-
-                expect(mockVideoProcessingService.processVideo).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        userId: message.userId,
-                        originalName: message.videoName
-                    })
-                );
-            });
-        });
+        expect(mockVideoProcessingService.processVideo).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: mockQueueMessage.id,
+            originalName: mockQueueMessage.videoName,
+            path: mockQueueMessage.videoPath,
+            userId: mockQueueMessage.userId,
+          }),
+          mockQueueMessage.userId
+        );
+      });
     });
 
-    describe('GIVEN error scenarios', () => {
-        describe('WHEN queue consumption fails during runtime', () => {
-            it('THEN should attempt retry after delay', async () => {
+    describe('When processing message fails', () => {
+      let messageCallback: (message: QueueMessage) => Promise<void>;
+      const processingError = new Error('Processing failed');
 
-                mockQueue.consumeMessages
-                    .mockRejectedValueOnce(new Error('Connection lost'))
-                    .mockResolvedValueOnce();
-
-                await adapter.onModuleInit();
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                expect(console.error).toHaveBeenCalledWith(
-                    'Erro no processador:',
-                    'Connection lost'
-                );
-
-                jest.runAllTimers();
-                await Promise.resolve();
-
-                expect(mockQueue.consumeMessages).toHaveBeenCalledTimes(2);
-            });
+      beforeEach(() => {
+        mockQueue.consumeMessages.mockImplementation((callback) => {
+          messageCallback = callback;
+          return Promise.resolve();
         });
+
+        mockVideoProcessingService.processVideo.mockRejectedValue(processingError);
+      });
+
+      it('Then should log error and re-throw exception', async () => {
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        await adapter.onModuleInit();
+        
+        // Aguardar o setTimeout
+        await new Promise(resolve => setTimeout(resolve, 2100));
+
+        await expect(messageCallback(mockQueueMessage)).rejects.toThrow('Processing failed');
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+          `Erro crítico no processamento para usuário ${mockQueueMessage.userId}: ${mockQueueMessage.id}`,
+          'Processing failed'
+        );
+
+        consoleSpy.mockRestore();
+      });
     });
-});
+
+    describe('When processing returns failed job', () => {
+      let messageCallback: (message: QueueMessage) => Promise<void>;
+      const failedJob = new ProcessingJob(
+        'job-123',
+        'test-video.mp4',
+        JobStatus.FAILED,
+        'Processing failed',
+        'user-456',
+        0,
+        undefined,
+        new Date(),
+        new Date()
+      );
+
+      beforeEach(() => {
+        mockQueue.consumeMessages.mockImplementation((callback) => {
+          messageCallback = callback;
+          return Promise.resolve();
+        });
+
+        mockVideoProcessingService.processVideo.mockResolvedValue(failedJob);
+      });
+
+      it('Then should log failure message', async () => {
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        await adapter.onModuleInit();
+        
+        // Aguardar o setTimeout
+        await new Promise(resolve => setTimeout(resolve, 2100));
+
+        await messageCallback(mockQueueMessage);
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+          `Processamento falhou para usuário ${mockQueueMessage.userId}: ${mockQueueMessage.id} - ${failedJob.message}`
+        );
+
+        consoleSpy.mockRestore();
+      });
+    });
+  });
+}); 

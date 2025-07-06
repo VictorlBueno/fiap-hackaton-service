@@ -207,7 +207,7 @@ describe('JWT Authentication Middleware', () => {
                     message: 'O token fornecido é inválido ou expirado',
                 });
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Erro na validação JWT:', 'Token inválido: Access token expired');
+                expect(consoleErrorSpy).toHaveBeenCalledWith('Erro na validação JWT:', 'Token inválido: Access token expired');
 
                 consoleErrorSpy.mockRestore();
             });
@@ -232,7 +232,7 @@ describe('JWT Authentication Middleware', () => {
 
                 await middleware.use(mockRequest as AuthenticatedRequest, mockResponse as Response, mockNext);
 
-                expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Erro na validação JWT:', 'Token inválido: Network error');
+                expect(consoleErrorSpy).toHaveBeenCalledWith('Erro na validação JWT:', 'Token inválido: Network error');
                 expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.UNAUTHORIZED);
                 expect(mockNext).not.toHaveBeenCalled();
 

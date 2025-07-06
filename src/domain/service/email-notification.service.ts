@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { EmailProviderPort } from '../ports/gateways/email-provider.port';
 import { ProcessingJob } from '../entities/processing-job.entity';
-import { JobStatus } from '../entities/processing-job.entity';
 import { AuthServiceAdapter } from '../../infrastructure/adapters/gateways/auth-service.adapter';
 
 @Injectable()
@@ -13,21 +12,16 @@ export class EmailNotificationService {
   ) {}
 
   async notifyVideoProcessingComplete(job: ProcessingJob, userSub: string): Promise<void> {
-    console.warn(`[DEBUG] Notificação: userSub recebido: ${userSub}`);
     const userEmail = await this.authService.getUserEmail(userSub);
-    console.warn(`[DEBUG] Notificação: e-mail retornado: ${userEmail}`);
     
     if (!userEmail) {
-      console.warn(`[DEBUG] Notificação: Nao foi possivel obter e-mail do usuario ${userSub} para envio de notificacao`);
       return;
     }
 
     if (job.isCompleted()) {
       const result = await this.sendSuccessEmail(job, userEmail);
-      console.warn(`[DEBUG] Notificação: Resultado envio e-mail sucesso: ${result}`);
     } else if (job.isFailed()) {
       const result = await this.sendErrorEmail(job, userEmail);
-      console.warn(`[DEBUG] Notificação: Resultado envio e-mail erro: ${result}`);
     }
   }
 

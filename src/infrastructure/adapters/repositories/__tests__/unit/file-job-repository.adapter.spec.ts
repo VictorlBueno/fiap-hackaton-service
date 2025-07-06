@@ -1,25 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Pool } from 'pg';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { PostgresJobRepositoryAdapter } from '../../file-job-repository.adapter';
 import {
   JobStatus,
   ProcessingJob,
 } from '../../../../../domain/entities/processing-job.entity';
-import { ProcessedFile } from '../../../../../domain/entities/processed-file.entity';
-import { Stats } from 'fs';
 
-interface MockStats {
-  size: number;
-  mtime: Date;
-}
 jest.mock('../../../../config/database.config');
-jest.mock('fs/promises');
-jest.mock('path');
-
-const mockFs = fs as jest.Mocked<typeof fs>;
-const mockPath = path as jest.Mocked<typeof path>;
 
 describe('PostgresJobRepositoryAdapter - Unit Tests', () => {
   let repository: PostgresJobRepositoryAdapter;
@@ -57,7 +44,6 @@ describe('PostgresJobRepositoryAdapter - Unit Tests', () => {
     );
 
     jest.clearAllMocks();
-    mockPath.join.mockImplementation((...paths) => paths.join('/'));
   });
 
   describe('Given PostgresJobRepositoryAdapter', () => {
@@ -84,7 +70,6 @@ describe('PostgresJobRepositoryAdapter - Unit Tests', () => {
           mockJob.message,
           mockJob.frameCount,
           mockJob.zipPath,
-          mockJob.zipPath,
           mockJob.createdAt,
         ]);
       });
@@ -95,7 +80,7 @@ describe('PostgresJobRepositoryAdapter - Unit Tests', () => {
         const [, values] = mockPool.query.mock.calls[0];
         expect(values[6]).toBeNull();
         expect(values[7]).toBeNull();
-        expect(values[8]).toBeNull();
+        expect(values[8]).toBe(mockPendingJob.createdAt);
       });
     });
 
@@ -329,102 +314,13 @@ describe('PostgresJobRepositoryAdapter - Unit Tests', () => {
         );
       });
 
-      it('Then should not throw error', async () => {
+      it('Then should propagate the error', async () => {
         await expect(
           repository.updateJobVideoPath('job-123', '/path'),
-        ).resolves.toBeUndefined();
+        ).rejects.toThrow('Path update failed');
       });
     });
 
-    describe('When getting processed files by user', () => {
-      const mockRows = [
-        {
-          zip_filename: 'frames1.zip',
-          created_at: new Date('2025-01-15T10:00:00Z'),
-        },
-        {
-          zip_filename: 'frames2.zip',
-          created_at: new Date('2025-01-15T09:00:00Z'),
-        },
-      ];
 
-      beforeEach(() => {
-        // @ts-ignore
-        mockPool.query.mockResolvedValue({ rows: mockRows });
-        mockFs.stat.mockResolvedValue({
-          size: 1024000,
-          mtime: new Date('2025-01-15T10:30:00Z'),
-        } as Stats);
-      });
-
-      it('Then should return ProcessedFile instances with file stats', async () => {
-        const result = await repository.getProcessedFilesByUser('user-123');
-
-        expect(result).toHaveLength(2);
-        expect(result[0]).toBeInstanceOf(ProcessedFile);
-        expect(result[0].filename).toBe('frames1.zip');
-        expect(result[0].size).toBe(1024000);
-        expect(result[0].downloadUrl).toBe('/download/frames1.zip');
-      });
-
-      it('Then should query only completed jobs with zip files', async () => {
-        await repository.getProcessedFilesByUser('user-123');
-
-        const [query, values] = mockPool.query.mock.calls[0];
-        expect(query).toContain("WHERE user_id = $1 AND status = 'completed'");
-        expect(query).toContain('AND zip_filename IS NOT NULL');
-        expect(values).toEqual(['user-123']);
-      });
-    });
-
-    describe('When file stats are unavailable', () => {
-      const mockRows = [
-        { zip_filename: 'missing.zip', created_at: new Date() },
-      ];
-
-      beforeEach(() => {
-        // @ts-ignore
-        mockPool.query.mockResolvedValue({ rows: mockRows });
-        mockFs.stat.mockRejectedValue(new Error('File not found'));
-      });
-
-      it('Then should create ProcessedFile with zero size', async () => {
-        const result = await repository.getProcessedFilesByUser('user-123');
-
-        expect(result).toHaveLength(1);
-        expect(result[0].size).toBe(0);
-        expect(result[0].filename).toBe('missing.zip');
-      });
-    });
-
-    describe('When getting processed files fails', () => {
-      beforeEach(() => {
-        // @ts-ignore
-        return mockPool.query.mockRejectedValue(new Error('Query failed'));
-      });
-
-      it('Then should return empty array', async () => {
-        const result = await repository.getProcessedFilesByUser('user-123');
-
-        expect(result).toEqual([]);
-        expect(mockPool.query).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('When handling null zip filenames', () => {
-      const mockRows = [{ zip_filename: null, created_at: new Date() }];
-
-      beforeEach(() => {
-        // @ts-ignore
-        return mockPool.query.mockResolvedValue({ rows: mockRows });
-      });
-
-      it('Then should skip null filenames', async () => {
-        const result = await repository.getProcessedFilesByUser('user-123');
-
-        expect(result).toEqual([]);
-        expect(mockFs.stat).not.toHaveBeenCalled();
-      });
-    });
   });
 });
