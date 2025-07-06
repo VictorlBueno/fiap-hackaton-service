@@ -1,262 +1,209 @@
-.PHONY: help docker-up docker-down docker-logs docker-ps docker-restart docker-clean tf-init tf-plan tf-apply tf-destroy tf-output tf-fmt tf-validate
+PROJECT_NAME = fiap-hack
+ENVIRONMENT = production
+AWS_REGION = us-east-1
+AWS_ACCOUNT_ID = 410211328905
+ECR_REPOSITORY = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(PROJECT_NAME)-$(ENVIRONMENT)
+IMAGE_TAG = latest
 
-help: ## Mostrar ajuda completa
-	@echo "🚀 Video Processor - Comandos Disponíveis"
-	@echo ""
-	@echo "📦 DOCKER (Desenvolvimento Local):"
-	@grep -E '^docker-[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "🏗️  TERRAFORM (Infraestrutura AWS):"
-	@grep -E '^tf-[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "🔧 UTILITÁRIOS:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -v '^docker-' | grep -v '^tf-' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+.PHONY: build
+build:
+	@echo "🔨 Construindo imagem Docker..."
+	docker build -t $(PROJECT_NAME):$(IMAGE_TAG) .
+	@echo "✅ Imagem construída com sucesso!"
 
-docker-up: ## Subir todos os serviços Docker
-	@echo "🚀 Iniciando serviços Docker..."
-	docker-compose up -d
-	@echo "✅ Serviços iniciados!"
-	@echo "📊 PostgreSQL: localhost:5433"
-	@echo "🐰 RabbitMQ UI: http://localhost:15672 (admin/admin123)"
+.PHONY: build-ecr
+build-ecr:
+	@echo "🔨 Construindo imagem para ECR..."
+	docker build -t $(ECR_REPOSITORY):$(IMAGE_TAG) .
+	@echo "✅ Imagem ECR construída com sucesso!"
 
-docker-down: ## Parar todos os serviços Docker
-	@echo "🛑 Parando serviços Docker..."
-	docker-compose down
-	@echo "✅ Serviços parados!"
+.PHONY: login-ecr
+login-ecr:
+	@echo "🔐 Fazendo login no ECR..."
+	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+	@echo "✅ Login realizado com sucesso!"
 
-docker-logs: ## Ver logs dos serviços Docker
-	docker-compose logs -f
+.PHONY: push-ecr
+push-ecr: login-ecr build-ecr
+	@echo "📤 Enviando imagem para ECR..."
+	docker push $(ECR_REPOSITORY):$(IMAGE_TAG)
+	@echo "✅ Imagem enviada com sucesso!"
 
-docker-logs-db: ## Ver logs do PostgreSQL
-	docker-compose logs -f postgres
-
-docker-logs-mq: ## Ver logs do RabbitMQ
-	docker-compose logs -f rabbitmq
-
-docker-ps: ## Listar status dos containers Docker
-	docker-compose ps
-
-docker-restart: ## Reiniciar todos os serviços Docker
-	@echo "🔄 Reiniciando serviços Docker..."
-	docker-compose restart
-	@echo "✅ Serviços reiniciados!"
-
-docker-shell-db: ## Conectar no PostgreSQL
-	docker-compose exec postgres psql -U postgres -d video_processor
-
-docker-ui-mq: ## Abrir RabbitMQ Management UI
-	@echo "🐰 Abrindo RabbitMQ Management UI..."
-	@echo "URL: http://localhost:15672"
-	@echo "User: admin"
-	@echo "Pass: admin123"
-
-docker-list-queues: ## Listar todas as filas do RabbitMQ
-	@echo "📋 Listando filas do RabbitMQ..."
-	docker-compose exec rabbitmq rabbitmqctl list_queues name messages consumers
-
-docker-clear-queue: ## Limpar fila específica (use QUEUE_NAME=nome_da_fila)
-	@echo "🧹 Limpando fila: $(or $(QUEUE_NAME),video_processing_queue)"
-	@if [ -z "$(QUEUE_NAME)" ]; then \
-		echo "💡 Use: make docker-clear-queue QUEUE_NAME=nome_da_fila"; \
-		echo "📋 Filas disponíveis:"; \
-		docker-compose exec rabbitmq rabbitmqctl list_queues name; \
-	else \
-		docker-compose exec rabbitmq rabbitmqctl purge_queue $(QUEUE_NAME); \
-		echo "✅ Fila $(QUEUE_NAME) limpa!"; \
-	fi
-
-docker-purge-all: ## Limpar todas as filas do RabbitMQ
-	@echo "🧹 Limpando todas as filas do RabbitMQ..."
-	@docker-compose exec rabbitmq rabbitmqctl list_queues name | grep -v "Listing queues" | while read queue; do \
-		if [ ! -z "$$queue" ]; then \
-			echo "Limpando fila: $$queue"; \
-			docker-compose exec rabbitmq rabbitmqctl purge_queue "$$queue"; \
-		fi; \
-	done
-	@echo "✅ Todas as filas foram limpas!"
-
-docker-clean: ## Limpar volumes e containers Docker
-	@echo "🧹 Limpeza completa Docker..."
-	docker-compose down -v --remove-orphans || true
-	docker container prune -f
-	docker volume prune -f
-	docker network prune -f
-	docker system prune -f
-	@echo "✅ Limpeza Docker concluída!"
-
-docker-force-clean: ## Limpeza forçada Docker (remove tudo relacionado ao projeto)
-	@echo "💥 Limpeza forçada Docker..."
-	docker stop video_processor_db video_processor_mq || true
-	docker rm video_processor_db video_processor_mq || true
-	docker volume rm fiap-hack_postgres_data fiap-hack_rabbitmq_data || true
-	docker network rm video_processor_network || true
-	docker image rm postgres:15-alpine rabbitmq:3.12-management-alpine || true
-	docker system prune -af
-	@echo "✅ Limpeza forçada Docker concluída!"
-
-docker-setup: ## Setup inicial completo Docker
-	@echo "🛠️ Setup inicial Docker..."
-	docker-compose up -d
-	@echo "⏳ Aguardando serviços ficarem prontos..."
-	sleep 10
-	@echo "✅ Setup Docker concluído!"
-	@echo ""
-	@echo "📊 PostgreSQL: localhost:5433"
-	@echo "🐰 RabbitMQ: localhost:5672"
-	@echo "🌐 RabbitMQ UI: http://localhost:15672"
-	@echo ""
-	@echo "📋 Para conectar na aplicação, use:"
-	@echo "   npm run start:dev"
-
-docker-health: ## Verificar saúde dos serviços Docker
-	@echo "🏥 Verificando saúde dos serviços Docker..."
-	@docker-compose ps
-	@echo ""
-	@echo "🔍 PostgreSQL:"
-	@docker-compose exec postgres pg_isready -U postgres -d video_processor || echo "❌ PostgreSQL não está pronto"
-	@echo ""
-	@echo "🔍 RabbitMQ:"
-	@docker-compose exec rabbitmq rabbitmq-diagnostics ping || echo "❌ RabbitMQ não está pronto"
-
-TF_DIR = terraform
-TF = terraform -chdir=$(TF_DIR)
-
-tf-init: ## Inicializar Terraform
-	@echo "🏗️ Inicializando Terraform..."
-	$(TF) init
+.PHONY: terraform-init
+terraform-init:
+	@echo "🚀 Inicializando Terraform..."
+	cd terraform && terraform init
 	@echo "✅ Terraform inicializado!"
 
-tf-plan: ## Verificar mudanças do Terraform
-	@echo "📋 Verificando mudanças do Terraform..."
-	$(TF) plan
-	@echo "✅ Verificação concluída!"
+.PHONY: terraform-plan
+terraform-plan:
+	@echo "📋 Gerando plano Terraform..."
+	cd terraform && terraform plan -var-file="k8s.tfvars"
+	@echo "✅ Plano gerado!"
 
-tf-apply: ## Aplicar mudanças do Terraform
-	@echo "🚀 Aplicando mudanças do Terraform..."
-	$(TF) apply -auto-approve
-	@echo "✅ Mudanças aplicadas!"
-	@echo "📋 Para ver os outputs: make tf-output"
+.PHONY: terraform-apply
+terraform-apply:
+	@echo "🚀 Aplicando configurações Terraform..."
+	cd terraform && terraform apply -var-file="k8s.tfvars" -auto-approve
+	@echo "✅ Configurações aplicadas!"
 
-tf-destroy: ## Destruir infraestrutura Terraform
-	@echo "💥 Destruindo infraestrutura Terraform..."
-	$(TF) destroy -auto-approve
-	@echo "✅ Infraestrutura destruída!"
+.PHONY: terraform-destroy
+terraform-destroy:
+	@echo "🗑️ Destruindo recursos Terraform..."
+	cd terraform && terraform destroy -var-file="k8s.tfvars" -auto-approve
+	@echo "✅ Recursos destruídos!"
 
-tf-output: ## Mostrar outputs do Terraform
-	@echo "📤 Outputs do Terraform:"
-	$(TF) output
+.PHONY: terraform-output
+terraform-output:
+	@echo "📤 Exibindo outputs Terraform..."
+	cd terraform && terraform output
+	@echo "✅ Outputs exibidos!"
 
-tf-fmt: ## Formatar arquivos Terraform
+.PHONY: terraform-fmt
+terraform-fmt:
 	@echo "🎨 Formatando arquivos Terraform..."
-	$(TF) fmt -recursive
+	cd terraform && terraform fmt -recursive
 	@echo "✅ Arquivos formatados!"
 
-tf-validate: ## Validar configuração Terraform
+.PHONY: terraform-validate
+terraform-validate:
 	@echo "✅ Validando configuração Terraform..."
-	$(TF) validate
+	cd terraform && terraform validate
 	@echo "✅ Configuração válida!"
 
-tf-refresh: ## Atualizar estado do Terraform
-	@echo "🔄 Atualizando estado do Terraform..."
-	$(TF) refresh
-	@echo "✅ Estado atualizado!"
+.PHONY: k8s-status
+k8s-status:
+	@echo "📊 Status dos recursos Kubernetes..."
+	kubectl get all -n video-processor
+	@echo "✅ Status exibido!"
 
-tf-show: ## Mostrar estado atual do Terraform
-	@echo "📊 Estado atual do Terraform:"
-	$(TF) show
+.PHONY: k8s-logs
+k8s-logs:
+	@echo "📝 Exibindo logs da aplicação..."
+	kubectl logs -f deployment/video-processor -n video-processor
+	@echo "✅ Logs exibidos!"
 
-cleanup: ## Limpar pastas temporárias (uploads, outputs, temp)
-	@echo "🧹 Limpando pastas temporárias..."
-	@./scripts/cleanup.sh
+.PHONY: k8s-describe
+k8s-describe:
+	@echo "🔍 Descrevendo recursos Kubernetes..."
+	kubectl describe deployment video-processor -n video-processor
+	@echo "✅ Descrição exibida!"
 
-setup: ## Setup completo (Docker + Terraform)
-	@echo "🛠️ Setup completo..."
-	@echo "📦 Configurando Docker..."
-	$(MAKE) docker-setup
-	@echo ""
-	@echo "🏗️ Configurando Terraform..."
-	$(MAKE) tf-init
-	@echo ""
-	@echo "✅ Setup completo concluído!"
+.PHONY: k8s-port-forward
+k8s-port-forward:
+	@echo "🔗 Configurando port-forward..."
+	kubectl port-forward service/video-processor-service 8080:80 -n video-processor
+	@echo "✅ Port-forward configurado!"
 
-health: ## Verificar saúde geral (Docker + Terraform)
-	@echo "🏥 Verificação de saúde geral..."
-	@echo ""
-	@echo "📦 Docker:"
-	$(MAKE) docker-health
-	@echo ""
-	@echo "🏗️ Terraform:"
-	$(MAKE) tf-show
-
-deploy-infra: ## Aplicar infraestrutura Terraform
-	@echo "🏗️ Aplicando infraestrutura Terraform..."
-	$(MAKE) tf-init
-	$(MAKE) tf-plan
-	@echo ""
-	@echo "❓ Deseja aplicar as mudanças? (y/N)"
-	@read -p "Confirmação: " confirm; \
-	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		$(MAKE) tf-apply; \
-		echo "✅ Infraestrutura aplicada!"; \
+.PHONY: k8s-scale
+k8s-scale:
+	@if [ -z "$(REPLICAS)" ]; then \
+		echo "💡 Use: make k8s-scale REPLICAS=3"; \
 	else \
-		echo "❌ Aplicação cancelada."; \
-		exit 1; \
+		echo "📈 Escalando para $(REPLICAS) réplicas..."; \
+		kubectl scale deployment video-processor --replicas=$(REPLICAS) -n video-processor; \
+		echo "✅ Deployment escalado!"; \
 	fi
 
-deploy: ## Deploy ECR (build + push)
-	@echo "🚀 Iniciando deploy ECR..."
-	@echo ""
-	@echo "📋 Verificando pré-requisitos..."
-	@command -v aws >/dev/null 2>&1 || { echo "❌ AWS CLI não encontrado. Instale: https://aws.amazon.com/cli/"; exit 1; }
-	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker não encontrado. Instale: https://docker.com/"; exit 1; }
-	@echo "✅ Pré-requisitos verificados!"
-	@echo ""
-	@echo "📤 Obtendo URL do repositório ECR..."
-	$(MAKE) tf-init
-	@ECR_URL=$$(terraform -chdir=terraform output -raw repository_url 2>/dev/null || echo ""); \
-	if [ -z "$$ECR_URL" ]; then \
-		echo "❌ ECR não encontrado. Execute: make deploy-infra"; \
-		exit 1; \
-	fi; \
-	echo "✅ ECR URL: $$ECR_URL"; \
-	echo ""; \
-	echo "🐳 Build e push da imagem Docker..."; \
-	docker build -t $$ECR_URL:latest .; \
-	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $$ECR_URL; \
-	docker push $$ECR_URL:latest; \
-	echo "✅ Imagem enviada para ECR!"; \
-	echo ""; \
-	echo "🎉 Deploy ECR concluído!"; \
-	echo "📋 Para fazer deploy no Kubernetes, vá para o projeto /service"; \
-	echo "📋 Execute: cd ../service && make deploy"
+.PHONY: k8s-restart
+k8s-restart:
+	@echo "🔄 Reiniciando deployment..."
+	kubectl rollout restart deployment/video-processor -n video-processor
+	@echo "✅ Deployment reiniciado!"
 
-deploy-ecr: ## Deploy apenas no ECR (build + push)
-	@echo "🐳 Deploy ECR - Build e push da imagem..."
+.PHONY: k8s-rollback
+k8s-rollback:
+	@echo "⏪ Fazendo rollback do deployment..."
+	kubectl rollout undo deployment/video-processor -n video-processor
+	@echo "✅ Rollback concluído!"
+
+.PHONY: deploy
+deploy: push-ecr terraform-apply
+	@echo "🚀 Deploy completo realizado!"
+	@echo "📊 Verificando status..."
+	@make k8s-status
+
+.PHONY: deploy-ecr-only
+deploy-ecr-only: push-ecr
+	@echo "📦 Apenas ECR atualizado!"
+
+.PHONY: deploy-k8s-only
+deploy-k8s-only: terraform-apply
+	@echo "☸️ Apenas Kubernetes atualizado!"
+
+.PHONY: dev-build
+dev-build:
+	@echo "🔨 Construindo para desenvolvimento..."
+	docker build -t $(PROJECT_NAME):dev .
+	@echo "✅ Build de desenvolvimento concluído!"
+
+.PHONY: dev-run
+dev-run: dev-build
+	@echo "🚀 Executando aplicação em modo desenvolvimento..."
+	docker run -p 3000:3000 --env-file .env $(PROJECT_NAME):dev
+	@echo "✅ Aplicação executada!"
+
+.PHONY: dev-stop
+dev-stop:
+	@echo "🛑 Parando containers de desenvolvimento..."
+	docker stop $$(docker ps -q --filter ancestor=$(PROJECT_NAME):dev) 2>/dev/null || true
+	@echo "✅ Containers parados!"
+
+.PHONY: clean
+clean:
+	@echo "🧹 Limpando recursos..."
+	docker system prune -f
+	@echo "✅ Limpeza concluída!"
+
+.PHONY: clean-images
+clean-images:
+	@echo "🗑️ Removendo imagens Docker..."
+	docker rmi $(PROJECT_NAME):$(IMAGE_TAG) $(PROJECT_NAME):dev 2>/dev/null || true
+	@echo "✅ Imagens removidas!"
+
+.PHONY: help
+help:
+	@echo "📚 Comandos disponíveis:"
 	@echo ""
-	@echo "📋 Verificando pré-requisitos..."
-	@command -v aws >/dev/null 2>&1 || { echo "❌ AWS CLI não encontrado"; exit 1; }
-	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker não encontrado"; exit 1; }
-	@echo "✅ Pré-requisitos verificados!"
+	@echo "🔨 BUILD:"
+	@echo "  build              - Construir imagem Docker"
+	@echo "  build-ecr          - Construir imagem para ECR"
 	@echo ""
-	@echo "📤 Obtendo URL do repositório ECR..."
-	$(MAKE) tf-init
-	ECR_URL=$$($(TF) output -raw repository_url 2>/dev/null || echo "")
-	@if [ -z "$$ECR_URL" ]; then \
-		echo "❌ ECR não encontrado. Execute: make tf-apply"; \
-		exit 1; \
-	fi
-	@echo "✅ ECR URL: $$ECR_URL"
+	@echo "📦 ECR:"
+	@echo "  login-ecr          - Login no ECR"
+	@echo "  push-ecr           - Enviar imagem para ECR"
 	@echo ""
-	@echo "🐳 Build da imagem Docker..."
-	docker build -t $$ECR_URL:latest .
-	@echo "✅ Build concluído!"
+	@echo "🏗️ TERRAFORM:"
+	@echo "  terraform-init     - Inicializar Terraform"
+	@echo "  terraform-plan     - Gerar plano Terraform"
+	@echo "  terraform-apply    - Aplicar configurações"
+	@echo "  terraform-destroy  - Destruir recursos"
+	@echo "  terraform-output   - Exibir outputs"
+	@echo "  terraform-fmt      - Formatar arquivos"
+	@echo "  terraform-validate - Validar configuração"
 	@echo ""
-	@echo "🔐 Login no ECR..."
-	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $$ECR_URL
-	@echo "✅ Login realizado!"
+	@echo "☸️ KUBERNETES:"
+	@echo "  k8s-status         - Status dos recursos"
+	@echo "  k8s-logs           - Logs da aplicação"
+	@echo "  k8s-describe       - Descrever recursos"
+	@echo "  k8s-port-forward   - Configurar port-forward"
+	@echo "  k8s-scale          - Escalar deployment"
+	@echo "  k8s-restart        - Reiniciar deployment"
+	@echo "  k8s-rollback       - Fazer rollback"
 	@echo ""
-	@echo "📤 Push da imagem..."
-	docker push $$ECR_URL:latest
-	@echo "✅ Imagem enviada para ECR!"
+	@echo "🚀 DEPLOY:"
+	@echo "  deploy             - Deploy completo (ECR + K8s)"
+	@echo "  deploy-ecr-only    - Apenas ECR"
+	@echo "  deploy-k8s-only    - Apenas Kubernetes"
 	@echo ""
-	@echo "🎉 Deploy ECR concluído!"
+	@echo "🔧 DESENVOLVIMENTO:"
+	@echo "  dev-build          - Build para desenvolvimento"
+	@echo "  dev-run            - Executar em desenvolvimento"
+	@echo "  dev-stop           - Parar containers de desenvolvimento"
+	@echo ""
+	@echo "🧹 LIMPEZA:"
+	@echo "  clean              - Limpar recursos Docker"
+	@echo "  clean-images       - Remover imagens Docker"
+	@echo ""
+	@echo "❓ AJUDA:"
+	@echo "  help               - Exibir esta ajuda"
