@@ -62,6 +62,12 @@ Para fazer deploy apenas no ECR:
 make deploy-ecr
 ```
 
+### Deploy Infraestrutura
+Para aplicar apenas a infraestrutura Terraform:
+```bash
+make deploy-infra
+```
+
 ### Pré-requisitos para Deploy
 - AWS CLI configurado
 - Docker instalado e funcionando
@@ -71,7 +77,13 @@ make deploy-ecr
 1. **ECR** (este projeto): `make deploy`
 2. **Kubernetes** (projeto /service): `cd ../service && make deploy`
 
-## �� Início Rápido
+### ✅ Status Atual
+- ✅ Repositório ECR criado: `fiap-hack-production`
+- ✅ URL do ECR: `410211328905.dkr.ecr.us-east-1.amazonaws.com/fiap-hack-production`
+- ✅ Imagem Docker buildada e enviada com sucesso
+- ✅ Pronto para deploy no Kubernetes
+
+## 🚀 Início Rápido
 
 ```bash
 # Subir todos os serviços
