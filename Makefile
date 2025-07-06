@@ -188,6 +188,21 @@ health: ## Verificar saúde geral (Docker + Terraform)
 	@echo "🏗️ Terraform:"
 	$(MAKE) tf-show
 
+deploy-infra: ## Aplicar infraestrutura Terraform
+	@echo "🏗️ Aplicando infraestrutura Terraform..."
+	$(MAKE) tf-init
+	$(MAKE) tf-plan
+	@echo ""
+	@echo "❓ Deseja aplicar as mudanças? (y/N)"
+	@read -p "Confirmação: " confirm; \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		$(MAKE) tf-apply; \
+		echo "✅ Infraestrutura aplicada!"; \
+	else \
+		echo "❌ Aplicação cancelada."; \
+		exit 1; \
+	fi
+
 deploy: ## Deploy ECR (build + push)
 	@echo "🚀 Iniciando deploy ECR..."
 	@echo ""
@@ -196,33 +211,52 @@ deploy: ## Deploy ECR (build + push)
 	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker não encontrado. Instale: https://docker.com/"; exit 1; }
 	@echo "✅ Pré-requisitos verificados!"
 	@echo ""
-	@echo "🏗️ Verificando infraestrutura Terraform..."
+	@echo "📤 Obtendo URL do repositório ECR..."
 	$(MAKE) tf-init
-	$(MAKE) tf-plan
+	@ECR_URL=$$(terraform -chdir=terraform output -raw repository_url 2>/dev/null || echo ""); \
+	if [ -z "$$ECR_URL" ]; then \
+		echo "❌ ECR não encontrado. Execute: make deploy-infra"; \
+		exit 1; \
+	fi; \
+	echo "✅ ECR URL: $$ECR_URL"; \
+	echo ""; \
+	echo "🐳 Build e push da imagem Docker..."; \
+	docker build -t $$ECR_URL:latest .; \
+	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $$ECR_URL; \
+	docker push $$ECR_URL:latest; \
+	echo "✅ Imagem enviada para ECR!"; \
+	echo ""; \
+	echo "🎉 Deploy ECR concluído!"; \
+	echo "📋 Para fazer deploy no Kubernetes, vá para o projeto /service"; \
+	echo "📋 Execute: cd ../service && make deploy"
+
+deploy-ecr: ## Deploy apenas no ECR (build + push)
+	@echo "🐳 Deploy ECR - Build e push da imagem..."
 	@echo ""
-	@echo "❓ Deseja aplicar as mudanças do Terraform? (y/N)"
-	@read -p "" -n 1 -r; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		$(MAKE) tf-apply; \
-		echo ""; \
-		echo "📤 Obtendo URL do repositório ECR..."; \
-		ECR_URL=$$($(TF) output -raw repository_url 2>/dev/null || echo ""); \
-		if [ -z "$$ECR_URL" ]; then \
-			echo "❌ Não foi possível obter a URL do ECR. Verifique se o Terraform foi aplicado."; \
-			exit 1; \
-		fi; \
-		echo "✅ ECR URL: $$ECR_URL"; \
-		echo ""; \
-		echo "🐳 Build e push da imagem Docker..."; \
-		docker build -t $$ECR_URL:latest .; \
-		aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $$ECR_URL; \
-		docker push $$ECR_URL:latest; \
-		echo "✅ Imagem enviada para ECR!"; \
-		echo ""; \
-		echo "🎉 Deploy ECR concluído!"; \
-		echo "📋 Para fazer deploy no Kubernetes, vá para o projeto /service"; \
-		echo "📋 Execute: cd ../service && make deploy"; \
-	else \
-		echo "❌ Deploy cancelado."; \
+	@echo "📋 Verificando pré-requisitos..."
+	@command -v aws >/dev/null 2>&1 || { echo "❌ AWS CLI não encontrado"; exit 1; }
+	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker não encontrado"; exit 1; }
+	@echo "✅ Pré-requisitos verificados!"
+	@echo ""
+	@echo "📤 Obtendo URL do repositório ECR..."
+	$(MAKE) tf-init
+	ECR_URL=$$($(TF) output -raw repository_url 2>/dev/null || echo "")
+	@if [ -z "$$ECR_URL" ]; then \
+		echo "❌ ECR não encontrado. Execute: make tf-apply"; \
 		exit 1; \
 	fi
+	@echo "✅ ECR URL: $$ECR_URL"
+	@echo ""
+	@echo "🐳 Build da imagem Docker..."
+	docker build -t $$ECR_URL:latest .
+	@echo "✅ Build concluído!"
+	@echo ""
+	@echo "🔐 Login no ECR..."
+	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $$ECR_URL
+	@echo "✅ Login realizado!"
+	@echo ""
+	@echo "📤 Push da imagem..."
+	docker push $$ECR_URL:latest
+	@echo "✅ Imagem enviada para ECR!"
+	@echo ""
+	@echo "🎉 Deploy ECR concluído!"
