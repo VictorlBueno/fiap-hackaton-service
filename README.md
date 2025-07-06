@@ -1,5 +1,88 @@
 # Docker Setup - Video Processor
 
+# Infraestrutura Terraform para ECR
+
+Este diretório contém a configuração Terraform para provisionar um repositório ECR (Elastic Container Registry) na AWS, utilizado para armazenar as imagens Docker do projeto. A infraestrutura está organizada seguindo o padrão dos outros projetos.
+
+## Estrutura
+
+```
+ecr/
+├── terraform/           # Configurações Terraform
+│   ├── main.tf         # Recursos principais
+│   ├── variables.tf    # Definição de variáveis
+│   ├── outputs.tf      # Outputs do módulo
+│   ├── providers.tf    # Configuração de providers
+│   └── terraform.tfvars # Valores das variáveis
+├── src/                # Código fonte da aplicação
+├── Dockerfile          # Imagem Docker para produção
+├── .dockerignore       # Arquivos ignorados no build
+├── Makefile           # Comandos de automação
+└── README.md          # Este arquivo
+```
+
+## Como usar
+
+1. Configure suas credenciais AWS (ex: via `aws configure` ou variáveis de ambiente).
+2. Execute os comandos usando o Makefile:
+   ```sh
+   make tf-init      # Inicializar Terraform
+   make tf-plan      # Verificar mudanças
+   make tf-apply     # Aplicar mudanças
+   make tf-output    # Ver outputs
+   ```
+
+## Variáveis
+
+As variáveis seguem o padrão dos outros projetos:
+- `aws_region`: Região AWS (padrão: us-east-1)
+- `environment`: Ambiente (padrão: production)
+- `project_name`: Nome do projeto (padrão: fiap-hack)
+- `force_delete`: Permite deletar repositório com imagens (padrão: false)
+
+O nome do repositório será: `{project_name}-{environment}` (ex: fiap-hack-production)
+
+## 🚀 Deploy ECR
+
+### Deploy Completo
+Para fazer deploy completo no ECR:
+```bash
+make deploy
+```
+
+Este comando irá:
+1. ✅ Verificar pré-requisitos (AWS CLI, Docker)
+2. 🏗️ Aplicar infraestrutura Terraform (se necessário)
+3. 🐳 Build e push da imagem Docker para ECR
+4. 📋 Orientar sobre deploy no Kubernetes (projeto /service)
+
+### Deploy ECR Apenas
+Para fazer deploy apenas no ECR:
+```bash
+make deploy-ecr
+```
+
+### Deploy Infraestrutura
+Para aplicar apenas a infraestrutura Terraform:
+```bash
+make deploy-infra
+```
+
+### Pré-requisitos para Deploy
+- AWS CLI configurado
+- Docker instalado e funcionando
+- Permissões adequadas na AWS (ECR)
+
+### Fluxo Completo
+1. **ECR** (este projeto): `make deploy`
+2. **Kubernetes** (projeto /service): `cd ../service && make deploy`
+
+### ✅ Status Atual
+- ✅ Repositório ECR criado: `fiap-hack-production`
+- ✅ URL do ECR: `410211328905.dkr.ecr.us-east-1.amazonaws.com/fiap-hack-production`
+- ✅ Imagem Docker buildada e enviada com sucesso
+- ✅ Pronto para deploy no Kubernetes
+
 ## 🚀 Início Rápido
 
 ```bash
