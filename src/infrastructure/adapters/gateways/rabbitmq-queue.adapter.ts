@@ -88,7 +88,8 @@ export class RabbitMQQueueAdapter
             console.error('Erro no processamento:', error.message);
             const shouldRequeue =
               !error.message.includes('FFmpeg') &&
-              !error.message.includes('arquivo');
+              !error.message.includes('arquivo') &&
+              !error.message.includes('file');
             this.channel.nack(msg, false, shouldRequeue);
           }
         }
@@ -160,6 +161,11 @@ export class RabbitMQQueueAdapter
     console.log(
       `Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts} em ${delay}ms...`,
     );
+
+    // Não agendar reconexão em ambiente de teste
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
 
     setTimeout(async () => {
       await this.connect();

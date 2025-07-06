@@ -314,10 +314,10 @@ describe('PostgresJobRepositoryAdapter - Unit Tests', () => {
         );
       });
 
-      it('Then should not throw error', async () => {
+      it('Then should propagate the error', async () => {
         await expect(
           repository.updateJobVideoPath('job-123', '/path'),
-        ).resolves.toBeUndefined();
+        ).rejects.toThrow('Path update failed');
       });
     });
 

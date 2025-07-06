@@ -123,6 +123,7 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
       console.log(`Caminho do vídeo atualizado: ${id} -> ${videoPath}`);
     } catch (error) {
       console.error('Erro ao atualizar caminho do vídeo:', error.message);
+      throw error;
     }
   }
 
