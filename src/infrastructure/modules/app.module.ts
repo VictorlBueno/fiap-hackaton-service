@@ -18,6 +18,8 @@ import {ListAllJobsUseCase} from "../../application/usecases/list-all-job-usecas
 import {EmailNotificationService} from "../../domain/service/email-notification.service";
 import {GmailEmailProviderAdapter} from "../adapters/gateways/gmail-email-provider.adapter";
 import {AuthServiceAdapter} from "../adapters/gateways/auth-service.adapter";
+import { RedisJobRepositoryAdapter } from "../adapters/gateways/redis.adapter";
+import { CompositeJobRepositoryAdapter } from "../adapters/gateways/composite-job-repository.adapter";
 
 @Module({
     imports: [
@@ -57,9 +59,16 @@ import {AuthServiceAdapter} from "../adapters/gateways/auth-service.adapter";
         },
         {
             provide: 'JobRepositoryPort',
+            useClass: CompositeJobRepositoryAdapter,
+        },
+        {
+            provide: 'RedisJobRepositoryAdapter',
+            useClass: RedisJobRepositoryAdapter,
+        },
+        {
+            provide: 'PostgresJobRepositoryAdapter',
             useClass: PostgresJobRepositoryAdapter,
         },
-
         PostgresJobRepositoryAdapter,
         FfmpegVideoProcessorAdapter,
         RabbitMQQueueAdapter,

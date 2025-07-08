@@ -11,7 +11,6 @@ export class RedisJobRepositoryAdapter implements JobRepositoryPort {
     this.redis = new Redis({
       host: process.env.REDIS_HOST || 'redis',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      // password: process.env.REDIS_PASSWORD, // se necessário
     });
   }
 
@@ -46,7 +45,6 @@ export class RedisJobRepositoryAdapter implements JobRepositoryPort {
     message: string,
     additionalData?: Partial<ProcessingJob>,
   ): Promise<void> {
-    // Busca o job atual
     const job = await this.findJobById(id, additionalData?.userId || '');
     if (!job) return;
     job.status = status;
@@ -57,8 +55,12 @@ export class RedisJobRepositoryAdapter implements JobRepositoryPort {
     await this.saveJob(job);
   }
 
-  async updateJobVideoPath(id: string, videoPath: string): Promise<void> {
-    // Não implementado para Redis, pois o path é usado apenas no processamento
+  async updateJobVideoPath(id: string, videoPath: string): Promise<void> {}
+
+  async removeJob(id: string, userId: string): Promise<void> {
+    const key = this.getJobKey(id, userId);
+    await this.redis.del(key);
+    await this.redis.srem(this.getUserJobsKey(userId), id);
   }
 
   private getJobKey(id: string, userId: string): string {
