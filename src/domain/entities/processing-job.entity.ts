@@ -15,34 +15,34 @@ export class ProcessingJob {
   public readonly id: string;
 
   @ApiProperty({ description: 'Nome original do vídeo', example: 'video.mp4' })
-  public readonly videoName: string;
+  private _videoName: string;
 
   @ApiProperty({ description: 'Status do processamento', enum: JobStatus })
-  public readonly status: JobStatus;
+  private _status: JobStatus;
 
   @ApiProperty({
     description: 'Mensagem do status',
     example: 'Processando vídeo...',
   })
-  public readonly message: string;
+  private _message: string;
 
   @ApiProperty({
     description: 'ID do usuário proprietário',
     example: 'user-123',
   })
-  public readonly userId: string;
+  private _userId: string;
 
   @ApiProperty({ description: 'Número de frames extraídos', required: false })
-  public readonly frameCount?: number;
+  private _frameCount?: number;
 
   @ApiProperty({ description: 'Nome do arquivo ZIP gerado', required: false })
-  public readonly zipPath?: string;
+  private _zipPath?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  public readonly createdAt: Date;
+  private _createdAt: Date;
 
   @ApiProperty({ description: 'Data da última atualização' })
-  public readonly updatedAt?: Date;
+  private _updatedAt?: Date;
 
   constructor(
     id: string,
@@ -56,14 +56,70 @@ export class ProcessingJob {
     updatedAt?: Date,
   ) {
     this.id = id;
-    this.videoName = videoName;
-    this.status = status;
-    this.message = message;
-    this.userId = userId;
-    this.frameCount = frameCount;
-    this.zipPath = zipPath;
-    this.createdAt = createdAt || new Date();
-    this.updatedAt = updatedAt;
+    this._videoName = videoName;
+    this._status = status;
+    this._message = message;
+    this._userId = userId;
+    this._frameCount = frameCount;
+    this._zipPath = zipPath;
+    this._createdAt = createdAt || new Date();
+    this._updatedAt = updatedAt;
+  }
+
+  get videoName(): string {
+    return this._videoName;
+  }
+  set videoName(value: string) {
+    this._videoName = value;
+  }
+
+  get status(): JobStatus {
+    return this._status;
+  }
+  set status(value: JobStatus) {
+    this._status = value;
+  }
+
+  get message(): string {
+    return this._message;
+  }
+  set message(value: string) {
+    this._message = value;
+  }
+
+  get userId(): string {
+    return this._userId;
+  }
+  set userId(value: string) {
+    this._userId = value;
+  }
+
+  get frameCount(): number | undefined {
+    return this._frameCount;
+  }
+  set frameCount(value: number | undefined) {
+    this._frameCount = value;
+  }
+
+  get zipPath(): string | undefined {
+    return this._zipPath;
+  }
+  set zipPath(value: string | undefined) {
+    this._zipPath = value;
+  }
+
+  get createdAt(): Date {
+    return this._createdAt;
+  }
+  set createdAt(value: Date) {
+    this._createdAt = value;
+  }
+
+  get updatedAt(): Date | undefined {
+    return this._updatedAt;
+  }
+  set updatedAt(value: Date | undefined) {
+    this._updatedAt = value;
   }
 
   static createPending(
