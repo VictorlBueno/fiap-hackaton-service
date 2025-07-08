@@ -28,6 +28,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 
 COPY --chown=nestjs:nodejs nest-cli.json ./
 
+RUN mkdir -p uploads outputs temp && chown -R nestjs:nodejs uploads outputs temp
+
 USER nestjs
 
 EXPOSE 3000
@@ -36,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node dist/health.js || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/main"] 
+CMD ["node", "dist/infrastructure/http/main"] 

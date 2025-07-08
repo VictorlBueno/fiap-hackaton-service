@@ -21,6 +21,7 @@ export class QueueProcessorAdapter implements OnModuleInit {
         try {
             await this.queue.consumeMessages(this.processMessage.bind(this));
         } catch (error) {
+            console.log('RabbitMQ não disponível para processamento, tentando novamente em 5 segundos...');
             setTimeout(() => this.startProcessing(), 5000);
         }
     }
