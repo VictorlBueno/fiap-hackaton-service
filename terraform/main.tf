@@ -1,13 +1,21 @@
-data "aws_secretsmanager_secret" "rabbitmq_credentials" {
-  name = "${var.project_name}/rabbitmq-credentials"
-}
+# Secret do RabbitMQ já foi destruído
+# data "aws_secretsmanager_secret" "rabbitmq_credentials" {
+#   name = "${var.project_name}/rabbitmq-credentials"
+# }
 
-data "aws_secretsmanager_secret_version" "rabbitmq_credentials" {
-  secret_id = data.aws_secretsmanager_secret.rabbitmq_credentials.id
-}
+# data "aws_secretsmanager_secret_version" "rabbitmq_credentials" {
+#   secret_id = data.aws_secretsmanager_secret.rabbitmq_credentials.id
+# }
 
 locals {
-  rabbitmq_credentials = jsondecode(data.aws_secretsmanager_secret_version.rabbitmq_credentials.secret_string)
+  # Usar valores padrão já que o secret foi destruído
+  rabbitmq_credentials = {
+    host     = "localhost"
+    port     = "5672"
+    username = "admin"
+    password = "password"
+    amqp_url = "amqp://admin:password@localhost:5672"
+  }
 }
 
 # ECR Repository - Commented out as it already exists
