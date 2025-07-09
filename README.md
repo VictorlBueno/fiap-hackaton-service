@@ -603,3 +603,27 @@ Para dúvidas ou problemas:
 1. Verifique os logs: `make k8s-logs`
 2. Consulte a documentação do Terraform
 3. Verifique a configuração no `k8s.tfvars`
+
+## Configuração do Redis
+
+Adicione as seguintes variáveis de ambiente no seu arquivo `.env`:
+
+```
+REDIS_HOST=redis
+REDIS_PORT=6379
+# REDIS_PASSWORD=
+```
+
+Esses valores já funcionam para o ambiente local com Docker Compose. Para produção, ajuste conforme necessário.
+
+## Como subir o Redis com Docker Compose
+
+O Redis já está incluído no arquivo `docker-compose.yml` do projeto. Para subir o Redis junto com os demais serviços, basta executar:
+
+```
+docker-compose up -d
+```
+
+Isso irá iniciar o Redis, Postgres, RabbitMQ e o serviço principal na rede interna do compose.
+
+Para produção, utilize uma configuração equivalente, garantindo que as variáveis de ambiente estejam corretas e o serviço Redis esteja acessível para o backend.

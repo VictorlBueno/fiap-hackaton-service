@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { S3StorageAdapter } from '../../s3-storage.adapter';
 
 // Mock manual para fs/promises
 jest.mock('fs/promises', () => ({
@@ -24,17 +25,14 @@ jest.mock('@aws-sdk/s3-request-presigner', () => ({
 }));
 
 // Mock manual para fs
+let mockCreateWriteStream;
 jest.mock('fs', () => ({
-  createWriteStream: jest.fn(),
+  createWriteStream: (...args) => mockCreateWriteStream(...args),
 }));
 
 // Mock manual para archiver
-jest.mock('archiver', () => () => ({
-  pipe: jest.fn(),
-  file: jest.fn(),
-  finalize: jest.fn(),
-  on: jest.fn(),
-}));
+let mockArchive;
+jest.mock('archiver', () => () => mockArchive);
 
 describe('S3StorageAdapter', () => {
   let adapter: any;
@@ -43,6 +41,7 @@ describe('S3StorageAdapter', () => {
   let mockGetSignedUrl: any;
   let s3ClientModule: any;
 
+  let originalFileExists;
   beforeEach(async () => {
     jest.clearAllMocks();
     s3ClientModule = require('@aws-sdk/client-s3');
@@ -59,6 +58,10 @@ describe('S3StorageAdapter', () => {
       providers: [S3StorageAdapter],
     }).compile();
     adapter = module.get(S3StorageAdapter);
+    originalFileExists = adapter.fileExists;
+  });
+  afterEach(() => {
+    adapter.fileExists = originalFileExists;
   });
 
   describe('Given S3StorageAdapter initialization', () => {
@@ -263,6 +266,106 @@ describe('S3StorageAdapter', () => {
         const result = (adapter as any).getS3Key('other/path/file.txt');
         expect(result).toBe('other/path/file.txt');
       });
+    });
+  });
+
+  describe('Given S3StorageAdapter zip creation', () => {
+    beforeEach(() => {
+      jest.resetModules();
+      jest.clearAllMocks();
+      mockCreateWriteStream = jest.fn(() => ({
+        on: jest.fn(function (event, cb) {
+          if (event === 'close') setTimeout(cb, 0);
+          return this;
+        }),
+        once: jest.fn(),
+        end: jest.fn(),
+        emit: jest.fn(),
+        pipe: jest.fn(),
+      }));
+      mockArchive = {
+        pipe: jest.fn(),
+        file: jest.fn(),
+        finalize: jest.fn(),
+        on: jest.fn(function (event, cb) {
+          if (event === 'close') setTimeout(cb, 0);
+          return this;
+        }),
+      };
+    });
+    
+    it('Then should throw if no files are added', async () => {
+      adapter.fileExists = jest.fn(() => Promise.resolve(false));
+      mockCreateWriteStream = jest.fn(() => ({
+        on: jest.fn(function (event, cb) {
+          if (event === 'close') setTimeout(cb, 0);
+          return this;
+        }),
+        once: jest.fn(),
+        end: jest.fn(),
+        emit: jest.fn(),
+        pipe: jest.fn(),
+      }));
+      await expect(adapter.createZip(['uploads/none.txt'], 'outputs/empty.zip')).rejects.toThrow('Nenhum arquivo foi adicionado ao ZIP');
+    });
+    it('Then should reject on archiver error', async () => {
+      const mockFiles = ['uploads/file1.txt'];
+      let errorCb;
+      mockArchive.on = jest.fn(function (event, cb) {
+        if (event === 'error') errorCb = cb;
+        if (event === 'close') setTimeout(cb, 0);
+        return this;
+      });
+      mockArchive.file.mockImplementation(() => mockArchive);
+      mockArchive.finalize.mockImplementation(() => {
+        if (errorCb) errorCb(new Error('zip error'));
+        return undefined;
+      });
+      const promise = adapter.createZip(mockFiles, 'outputs/test.zip');
+      await expect(promise).rejects.toThrow('zip error');
+    });
+  });
+
+  describe('Given S3StorageAdapter file download', () => {
+    it('Then should download file from S3 and write to local path', async () => {
+      jest.setTimeout(10000);
+      const mockS3Stream = new (require('stream').Readable)();
+      mockS3Stream._read = () => {};
+      const mockWriteStream = {
+        on: jest.fn(function(event, cb) { if (event === 'finish') setTimeout(cb, 0); return this; }),
+        once: jest.fn(),
+        end: jest.fn(),
+        emit: jest.fn(),
+        pipe: jest.fn(),
+      };
+      mockCreateWriteStream.mockReturnValue(mockWriteStream);
+      mockS3Stream.pipe = jest.fn(function(dest) {
+        setTimeout(() => dest.emit('finish'), 0);
+        return dest;
+      });
+      adapter.s3Client.send.mockResolvedValue({ Body: mockS3Stream });
+      await expect(adapter.downloadFile('uploads/file.mp4', 'local/file.mp4')).resolves.toBeUndefined();
+      expect(adapter.s3Client.send).toHaveBeenCalled();
+      expect(mockCreateWriteStream).toHaveBeenCalledWith('local/file.mp4');
+    });
+    it('Then should throw if S3 returns error', async () => {
+      adapter.s3Client.send.mockRejectedValue(new Error('S3 error'));
+      await expect(adapter.downloadFile('uploads/file.mp4', 'local/file.mp4')).rejects.toThrow('Erro ao baixar arquivo do S3: S3 error');
+    });
+  });
+
+  describe('Given S3StorageAdapter file stream', () => {
+    it('Then should return a readable stream from S3', async () => {
+      const mockS3Stream = new (require('stream').Readable)();
+      mockS3Stream._read = () => {};
+      adapter.s3Client.send.mockResolvedValue({ Body: mockS3Stream });
+      const result = await adapter.getFileStream('uploads/file.mp4');
+      expect(result).toBe(mockS3Stream);
+      expect(adapter.s3Client.send).toHaveBeenCalled();
+    });
+    it('Then should throw if Body is not a stream', async () => {
+      adapter.s3Client.send.mockResolvedValue({ Body: 'not-a-stream' });
+      await expect(adapter.getFileStream('uploads/file.mp4')).rejects.toThrow('Body não é um stream');
     });
   });
 }); 

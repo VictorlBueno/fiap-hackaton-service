@@ -63,16 +63,19 @@ describe('QueueProcessorAdapter', () => {
   });
 
   it('should call processVideo on processMessage', async () => {
-    mockVideoProcessingService.processVideo.mockResolvedValue({
-      isFailed: () => false,
-      isCompleted: () => true,
-      id: 'job-123',
-      videoName: 'test-video.mp4',
-      status: JobStatus.COMPLETED,
-      message: '',
-      userId: 'user-456',
-      createdAt: new Date(),
-    });
+    mockVideoProcessingService.processVideo.mockResolvedValue(
+      new ProcessingJob(
+        'job-123',
+        'test-video.mp4',
+        JobStatus.COMPLETED,
+        '',
+        'user-456',
+        undefined,
+        undefined,
+        new Date(),
+        new Date()
+      )
+    );
     // @ts-ignore
     await adapter['processMessage'](mockQueueMessage);
     expect(mockVideoProcessingService.processVideo).toHaveBeenCalled();
@@ -111,7 +114,18 @@ describe('QueueProcessorAdapter', () => {
           return Promise.resolve();
         });
 
-        mockVideoProcessingService.processVideo.mockResolvedValue(mockProcessingJob);
+        const completedJob = new ProcessingJob(
+          mockQueueMessage.id,
+          mockQueueMessage.videoName,
+          JobStatus.COMPLETED,
+          'Success',
+          mockQueueMessage.userId,
+          undefined,
+          undefined,
+          new Date(),
+          new Date()
+        );
+        mockVideoProcessingService.processVideo.mockResolvedValue(completedJob);
       });
 
       it('Then should create video entity and process successfully', async () => {
