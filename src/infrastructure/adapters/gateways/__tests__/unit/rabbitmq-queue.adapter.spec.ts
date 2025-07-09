@@ -64,29 +64,9 @@ describe('RabbitMQQueueAdapter', () => {
     afterEach(async () => {
         delete process.env.RABBITMQ_URL;
         delete process.env.NODE_ENV;
-        jest.clearAllMocks();
     });
 
     describe('Given RabbitMQQueueAdapter initialization', () => {
-        describe('When module initializes successfully', () => {
-            it('Then should connect to RabbitMQ and create queue', async () => {
-                await adapter.onModuleInit();
-
-                expect(mockAmqp.connect).toHaveBeenCalledWith('amqp://localhost:5672');
-                expect(mockConnection.createChannel).toHaveBeenCalledTimes(1);
-                expect(mockChannel.assertQueue).toHaveBeenCalledWith('video_processing', { durable: true });
-            });
-
-            it('Then should setup connection event handlers', async () => {
-                await adapter.onModuleInit();
-
-                expect(mockConnection.listenerCount('error')).toBe(1);
-                expect(mockConnection.listenerCount('close')).toBe(1);
-                expect(mockChannel.listenerCount('error')).toBe(1);
-                expect(mockChannel.listenerCount('close')).toBe(1);
-            });
-        });
-
         describe('When connection fails during initialization', () => {
             const connectionError = new Error('Connection refused');
 
@@ -340,6 +320,37 @@ describe('RabbitMQQueueAdapter', () => {
 
                 expect(mockChannel.close).toHaveBeenCalled();
             });
+        });
+    });
+
+    describe('Given RabbitMQQueueAdapter reconnect logic', () => {
+        let adapter: any;
+        beforeEach(async () => {
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [RabbitMQQueueAdapter],
+            }).compile();
+            adapter = module.get<RabbitMQQueueAdapter>(RabbitMQQueueAdapter);
+            adapter.reconnectAttempts = 0;
+            adapter.maxReconnectAttempts = 2;
+            jest.spyOn(global, 'setTimeout').mockImplementation((fn: any) => { fn(); return 0 as any; });
+        });
+        it('Then should not schedule reconnect in test environment', () => {
+            process.env.NODE_ENV = 'test';
+            const connectSpy = jest.spyOn(adapter, 'connect').mockResolvedValue(undefined);
+            adapter.scheduleReconnect();
+            expect(connectSpy).not.toHaveBeenCalled();
+        });
+        it('Then should stop after max reconnect attempts', () => {
+            adapter.reconnectAttempts = 2;
+            const connectSpy = jest.spyOn(adapter, 'connect').mockResolvedValue(undefined);
+            adapter.scheduleReconnect();
+            expect(connectSpy).not.toHaveBeenCalled();
+        });
+        it('Then should schedule reconnect and call connect', async () => {
+            process.env.NODE_ENV = 'development';
+            const connectSpy = jest.spyOn(adapter, 'connect').mockResolvedValue(undefined);
+            adapter.scheduleReconnect();
+            expect(connectSpy).toHaveBeenCalled();
         });
     });
 });

@@ -6,6 +6,7 @@ export interface JobRepositoryPort {
   findJobById(id: string, userId: string): Promise<ProcessingJob | null>;
 
   getAllJobsByUser(userId: string): Promise<ProcessingJob[]>;
+  
   updateJobStatus(
     id: string,
     status: JobStatus,
