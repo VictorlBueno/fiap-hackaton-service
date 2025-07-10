@@ -1,38 +1,62 @@
-# Secret do RabbitMQ já foi destruído
-# data "aws_secretsmanager_secret" "rabbitmq_credentials" {
-#   name = "${var.project_name}/rabbitmq-credentials"
-# }
-
-# data "aws_secretsmanager_secret_version" "rabbitmq_credentials" {
-#   secret_id = data.aws_secretsmanager_secret.rabbitmq_credentials.id
-# }
-
-locals {
-  # Usar valores padrão já que o secret foi destruído
-  rabbitmq_credentials = {
-    host     = "localhost"
-    port     = "5672"
-    username = "admin"
-    password = "password"
-    amqp_url = "amqp://admin:password@localhost:5672"
+data "terraform_remote_state" "vpc" {
+  backend = "s3"
+  config = {
+    bucket = "fiap-hack-terraform-state"
+    key    = "vpc/terraform.tfstate"
+    region = "us-east-1"
   }
 }
 
-# ECR Repository - Commented out as it already exists
-# resource "aws_ecr_repository" "this" {
-#   name                 = "${var.project_name}-${var.environment}"
-#   image_tag_mutability = "MUTABLE"
-#   force_delete         = var.force_delete
-# }
+data "terraform_remote_state" "eks" {
+  backend = "s3"
+  config = {
+    bucket = "fiap-hack-terraform-state"
+    key    = "eks/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+data "terraform_remote_state" "database" {
+  backend = "s3"
+  config = {
+    bucket = "fiap-hack-terraform-state"
+    key    = "database/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+data "terraform_remote_state" "rabbitmq" {
+  backend = "s3"
+  config = {
+    bucket = "fiap-hack-terraform-state"
+    key    = "rabbitmq/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+data "terraform_remote_state" "redis" {
+  backend = "s3"
+  config = {
+    bucket = "fiap-hack-terraform-state"
+    key    = "redis/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+locals {
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Component   = "service"
+  }
+}
 
 # Namespace
 resource "kubernetes_namespace" "app" {
   metadata {
     name = var.app_namespace
-    labels = {
-      app         = var.app_name
-      environment = var.environment
-    }
+    labels = local.tags
   }
 }
 
@@ -68,21 +92,25 @@ resource "kubernetes_secret" "app" {
   type = "Opaque"
 
   data = {
-    DB_HOST                = var.db_host
-    DB_PORT                = var.db_port
-    DB_NAME                = var.db_name
-    DB_USERNAME            = var.db_username
+    DB_HOST                = data.terraform_remote_state.database.outputs.db_endpoint
+    DB_PORT                = "5432"
+    DB_NAME                = data.terraform_remote_state.database.outputs.db_name
+    DB_USERNAME            = data.terraform_remote_state.database.outputs.db_username
     DB_PASSWORD            = var.db_password
-    RABBITMQ_HOST          = local.rabbitmq_credentials.host
-    RABBITMQ_PORT          = local.rabbitmq_credentials.port
-    RABBITMQ_USERNAME      = local.rabbitmq_credentials.username
-    RABBITMQ_PASSWORD      = local.rabbitmq_credentials.password
-    RABBITMQ_URL           = local.rabbitmq_credentials.amqp_url
+    RABBITMQ_HOST          = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name
+    RABBITMQ_PORT          = tostring(data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port)
+    RABBITMQ_USERNAME      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username
+    RABBITMQ_PASSWORD      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password
+    RABBITMQ_URL           = "amqp://${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password}@${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port}/"
     AWS_REGION             = var.aws_region
     AWS_ACCESS_KEY_ID      = var.aws_access_key_id
     AWS_SECRET_ACCESS_KEY  = var.aws_secret_access_key
     AWS_COGNITO_USER_POOL_ID = var.aws_cognito_user_pool_id
     AWS_COGNITO_CLIENT_ID    = var.aws_cognito_client_id
+    REDIS_HOST             = data.terraform_remote_state.redis.outputs.redis_host
+    REDIS_PORT             = tostring(data.terraform_remote_state.redis.outputs.redis_port)
+    REDIS_PASSWORD         = data.terraform_remote_state.redis.outputs.redis_password
+    REDIS_URL              = data.terraform_remote_state.redis.outputs.redis_connection_string
   }
 }
 
@@ -389,6 +417,46 @@ resource "kubernetes_deployment" "app" {
               secret_key_ref {
                 name = kubernetes_secret.app.metadata[0].name
                 key  = "AWS_COGNITO_CLIENT_ID"
+              }
+            }
+          }
+
+          env {
+            name = "REDIS_HOST"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "REDIS_HOST"
+              }
+            }
+          }
+
+          env {
+            name = "REDIS_PORT"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "REDIS_PORT"
+              }
+            }
+          }
+
+          env {
+            name = "REDIS_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "REDIS_PASSWORD"
+              }
+            }
+          }
+
+          env {
+            name = "REDIS_URL"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "REDIS_URL"
               }
             }
           }

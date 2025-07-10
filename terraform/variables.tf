@@ -28,39 +28,12 @@ variable "tags" {
   default     = {}
 }
 
-# =============================================================================
-# VARIÁVEIS KUBERNETES
-# =============================================================================
-
 # Configurações do banco de dados
-variable "db_host" {
-  description = "Host do banco de dados RDS"
-  type        = string
-}
-
-variable "db_port" {
-  description = "Porta do banco de dados"
-  type        = string
-  default     = "5432"
-}
-
-variable "db_name" {
-  description = "Nome do banco de dados"
-  type        = string
-}
-
-variable "db_username" {
-  description = "Usuário do banco de dados"
-  type        = string
-}
-
 variable "db_password" {
   description = "Senha do banco de dados"
   type        = string
   sensitive   = true
 }
-
-
 
 # Configurações AWS
 variable "aws_access_key_id" {

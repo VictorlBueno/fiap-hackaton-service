@@ -54,4 +54,20 @@ output "hpa_min_replicas" {
 output "hpa_max_replicas" {
   description = "Máximo de réplicas do HPA"
   value       = var.hpa_max_replicas
+}
+
+output "redis_host" {
+  description = "Host do Redis consumido pelo serviço"
+  value       = data.terraform_remote_state.redis.outputs.redis_host
+}
+
+output "redis_port" {
+  description = "Porta do Redis consumido pelo serviço"
+  value       = data.terraform_remote_state.redis.outputs.redis_port
+}
+
+output "redis_url" {
+  description = "URL de conexão do Redis consumido pelo serviço"
+  value       = data.terraform_remote_state.redis.outputs.redis_connection_string
+  sensitive   = true
 } 
