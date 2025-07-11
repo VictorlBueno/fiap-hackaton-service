@@ -88,13 +88,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Salvar imagem tag
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-tag
-          path: |
-            image-tag.txt
-          retention-days: 1
+
 
   build-test:
     name: Testar Build da Imagem Docker
@@ -140,13 +134,6 @@ jobs:
       - name: Configurar kubectl para EKS
         run: |
           aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
-
-      - name: Baixar tag da imagem
-        uses: actions/download-artifact@v4
-        with:
-          name: image-tag
-          path: ./
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
       - name: Inicializar Terraform (reconfigure)
         working-directory: terraform
@@ -243,7 +230,7 @@ jobs:
         if: needs.deploy.result == 'success'
         run: |
           echo "✅ Deploy da aplicação concluído com sucesso!"
-          echo "🐳 Imagem: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+          echo "🐳 Imagem: ${{ env.ECR_REPOSITORY }}:latest"
           echo "🌐 LoadBalancer: $(kubectl get svc video-processor-service -n video-processor -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo 'N/A')"
 
       - name: Notificar falha
