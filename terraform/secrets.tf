@@ -38,11 +38,11 @@ resource "kubernetes_secret" "app" {
     DB_PASSWORD            = data.terraform_remote_state.database.outputs.db_password
     
     # RabbitMQ
-    RABBITMQ_HOST          = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name
+    RABBITMQ_HOST          = "${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name}.${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_namespace}.svc.cluster.local"
     RABBITMQ_PORT          = tostring(data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port)
     RABBITMQ_USERNAME      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username
     RABBITMQ_PASSWORD      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password
-    RABBITMQ_URL           = "amqp://${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password}@${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port}/"
+    RABBITMQ_URL           = "amqp://${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password}@${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name}.${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_namespace}.svc.cluster.local:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port}/"
     RABBITMQ_VHOST         = "/"
     
     # AWS
