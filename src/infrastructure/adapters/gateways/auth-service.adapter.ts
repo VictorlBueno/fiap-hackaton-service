@@ -12,7 +12,7 @@ export class AuthServiceAdapter {
   private readonly authServiceUrl: string;
 
   constructor() {
-    this.authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3234';
+    this.authServiceUrl = process.env.AUTH_SERVICE_URL!;
   }
 
   async getUserEmail(userSub: string): Promise<string | null> {

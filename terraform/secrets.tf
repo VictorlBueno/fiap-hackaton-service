@@ -30,6 +30,8 @@ resource "kubernetes_secret" "app" {
   type = "Opaque"
 
   data = {
+    AUTH_SERVICE_URL       = "https://mlpr641j1i.execute-api.us-east-1.amazonaws.com/v1/api"
+
     # Database
     DB_HOST                = replace(data.terraform_remote_state.database.outputs.db_endpoint, ":5432", "")
     DB_PORT                = "5432"
