@@ -23,38 +23,46 @@ export class VideoProcessingService {
       video.id,
       JobStatus.PROCESSING,
       'Processando vídeo e extraindo frames...',
+      { userId: video.userId }
     );
 
     await this.jobRepository.updateJobVideoPath(video.id, video.path);
 
     try {
-      const videoExists = await this.fileStorage.fileExists(video.path);
-      if (!videoExists) {
-        await this.jobRepository.updateJobStatus(
-          video.id,
-          JobStatus.FAILED,
-          `Arquivo de vídeo local não encontrado: ${video.path}`,
-        );
-        throw new Error(`Arquivo de vídeo local não encontrado: ${video.path}`);
-      }
-
       const s3VideoKey = `uploads/${video.id}_${video.originalName}`;
-      await this.fileStorage.uploadFile(video.path, s3VideoKey);
-
+      
       const s3VideoExists = await this.fileStorage.fileExists(s3VideoKey);
       if (!s3VideoExists) {
         await this.jobRepository.updateJobStatus(
           video.id,
           JobStatus.FAILED,
-          `Falha no upload do vídeo para S3: ${s3VideoKey}`,
+          `Arquivo de vídeo não encontrado no S3: ${s3VideoKey}`,
+          { userId: video.userId }
         );
-        throw new Error(`Falha no upload do vídeo para S3: ${s3VideoKey}`);
+        throw new Error(`Arquivo de vídeo não encontrado no S3: ${s3VideoKey}`);
       }
 
-      const tempDir = `temp/${video.id}`;
+      const tempVideoPath = `/tmp/${video.id}_${video.originalName}`;
+      console.log(`📥 Fazendo download temporário do S3: ${s3VideoKey} -> ${tempVideoPath}`);
+      
+      try {
+        await this.fileStorage.downloadFile(s3VideoKey, tempVideoPath);
+        console.log(`✅ Download temporário concluído: ${tempVideoPath}`);
+      } catch (downloadError) {
+        console.error(`❌ Erro no download do S3: ${downloadError.message}`);
+        await this.jobRepository.updateJobStatus(
+          video.id,
+          JobStatus.FAILED,
+          `Erro ao baixar arquivo do S3: ${downloadError.message}`,
+          { userId: video.userId }
+        );
+        throw new Error(`Erro ao baixar arquivo do S3: ${downloadError.message}`);
+      }
+
+      const tempDir = `/tmp/frames_${video.id}`;
 
       const frames = await this.videoProcessor.extractFrames(
-        video.path,
+        tempVideoPath,
         tempDir,
       );
 
@@ -63,22 +71,38 @@ export class VideoProcessingService {
           video.id,
           JobStatus.FAILED,
           'Nenhum frame extraído do vídeo',
+          { userId: video.userId }
         );
         throw new Error('Nenhum frame extraído do vídeo');
       }
 
       const zipFilename = `${video.id}.zip`;
-      const zipPath = `outputs/${zipFilename}`;
+      const tempZipPath = `/tmp/${zipFilename}`;
 
-      await this.fileStorage.createZip(frames, zipPath);
+      await this.fileStorage.createZip(frames, tempZipPath);
 
       const s3ZipKey = `outputs/${zipFilename}`;
+      try {
+        await this.fileStorage.uploadFile(tempZipPath, s3ZipKey);
+        console.log(`✅ ZIP enviado para S3: ${s3ZipKey}`);
+      } catch (uploadError) {
+        console.error(`❌ Erro no upload do ZIP para S3: ${uploadError.message}`);
+        await this.jobRepository.updateJobStatus(
+          video.id,
+          JobStatus.FAILED,
+          `Erro ao enviar ZIP para S3: ${uploadError.message}`,
+          { userId: video.userId }
+        );
+        throw new Error(`Erro ao enviar ZIP para S3: ${uploadError.message}`);
+      }
+
       const zipExists = await this.fileStorage.fileExists(s3ZipKey);
       if (!zipExists) {
         await this.jobRepository.updateJobStatus(
           video.id,
           JobStatus.FAILED,
           'Falha ao criar arquivo ZIP no S3',
+          { userId: video.userId }
         );
         throw new Error('Falha ao criar arquivo ZIP no S3');
       }
@@ -90,15 +114,17 @@ export class VideoProcessingService {
         {
           frameCount: frames.length,
           zipPath: zipFilename,
+          userId: video.userId
         },
       );
 
-      await this.fileStorage.deleteFile(video.path);
-      
       try {
+        await this.fileStorage.deleteFile(tempVideoPath);
+        await this.fileStorage.deleteFile(tempZipPath);
         await fs.rm(tempDir, { recursive: true, force: true });
-      } catch (error) {
-        console.warn(`Erro ao remover pasta temporária: ${error.message}`);
+        console.log(`🧹 Arquivos temporários removidos`);
+      } catch (cleanupError) {
+        console.warn(`⚠️ Erro na limpeza de arquivos temporários: ${cleanupError.message}`);
       }
 
       const result = await this.jobRepository.findJobById(video.id, video.userId);
@@ -122,6 +148,7 @@ export class VideoProcessingService {
         video.id,
         JobStatus.FAILED,
         error.message,
+        { userId: video.userId }
       );
 
       try {

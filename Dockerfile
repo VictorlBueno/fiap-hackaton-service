@@ -13,7 +13,7 @@ RUN npm run build
 
 FROM node:18-alpine AS production
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init ffmpeg
 
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nestjs -u 1001

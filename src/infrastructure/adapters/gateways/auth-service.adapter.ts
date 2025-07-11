@@ -12,13 +12,14 @@ export class AuthServiceAdapter {
   private readonly authServiceUrl: string;
 
   constructor() {
-    this.authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3234';
+    this.authServiceUrl = process.env.AUTH_SERVICE_URL!;
   }
 
   async getUserEmail(userSub: string): Promise<string | null> {
     try {
+      console.log(`${this.authServiceUrl}/v1/users/${userSub}/email`)
       const response = await axios.get<AuthServiceResponse>(
-        `${this.authServiceUrl}/api/v1/users/${userSub}/email`,
+        `${this.authServiceUrl}/v1/users/${userSub}/email`,
         {
           timeout: 5000,
         }

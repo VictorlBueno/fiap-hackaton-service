@@ -38,19 +38,19 @@ terraform-init:
 .PHONY: terraform-plan
 terraform-plan:
 	@echo "📋 Gerando plano Terraform..."
-	cd terraform && terraform plan -var-file="k8s.tfvars"
+	cd terraform && terraform plan
 	@echo "✅ Plano gerado!"
 
 .PHONY: terraform-apply
 terraform-apply:
 	@echo "🚀 Aplicando configurações Terraform..."
-	cd terraform && terraform apply -var-file="k8s.tfvars" -auto-approve
+	cd terraform && terraform apply -auto-approve
 	@echo "✅ Configurações aplicadas!"
 
 .PHONY: terraform-destroy
 terraform-destroy:
 	@echo "🗑️ Destruindo recursos Terraform..."
-	cd terraform && terraform destroy -var-file="k8s.tfvars" -auto-approve
+	cd terraform && terraform destroy -auto-approve
 	@echo "✅ Recursos destruídos!"
 
 .PHONY: terraform-output
@@ -177,7 +177,7 @@ get-rabbitmq-status:
 .PHONY: eks-create
 eks-create:
 	@echo "🚀 Criando cluster EKS..."
-	cd terraform && terraform apply -var-file="k8s.tfvars" -auto-approve -target=aws_eks_cluster.main -target=aws_eks_node_group.main
+	cd terraform && terraform apply -auto-approve -target=aws_eks_cluster.main -target=aws_eks_node_group.main
 	@echo "✅ Cluster EKS criado!"
 	@echo "📋 Configurando kubectl..."
 	aws eks update-kubeconfig --name fiap-hack-production --region us-east-1
@@ -186,7 +186,7 @@ eks-create:
 .PHONY: eks-destroy
 eks-destroy:
 	@echo "🗑️ Destruindo cluster EKS..."
-	cd terraform && terraform destroy -var-file="k8s.tfvars" -auto-approve
+	cd terraform && terraform destroy -auto-approve
 	@echo "✅ Cluster EKS destruído!"
 
 .PHONY: eks-status

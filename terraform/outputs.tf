@@ -2,10 +2,25 @@
 # OUTPUTS ECR
 # =============================================================================
 
-# output "repository_url" {
-#   description = "URL do repositório ECR"
-#   value       = aws_ecr_repository.this.repository_url
-# }
+output "ecr_repository_url" {
+  description = "URL do repositório ECR"
+  value       = aws_ecr_repository.app.repository_url
+}
+
+output "ecr_repository_name" {
+  description = "Nome do repositório ECR"
+  value       = aws_ecr_repository.app.name
+}
+
+output "s3_bucket_name" {
+  description = "Nome do bucket S3"
+  value       = aws_s3_bucket.app.bucket
+}
+
+output "s3_bucket_arn" {
+  description = "ARN do bucket S3"
+  value       = aws_s3_bucket.app.arn
+}
 
 # =============================================================================
 # OUTPUTS KUBERNETES
@@ -26,34 +41,9 @@ output "service_name" {
   value       = kubernetes_service.app.metadata[0].name
 }
 
-output "ingress_host" {
-  description = "Host do Ingress"
-  value       = var.ingress_host
-}
-
-output "app_image" {
-  description = "Imagem Docker utilizada"
-  value       = var.app_image
-}
-
-output "app_replicas" {
-  description = "Número de réplicas configuradas"
-  value       = var.app_replicas
-}
-
 output "hpa_name" {
   description = "Nome do Horizontal Pod Autoscaler"
   value       = kubernetes_horizontal_pod_autoscaler_v2.app.metadata[0].name
-}
-
-output "hpa_min_replicas" {
-  description = "Mínimo de réplicas do HPA"
-  value       = var.hpa_min_replicas
-}
-
-output "hpa_max_replicas" {
-  description = "Máximo de réplicas do HPA"
-  value       = var.hpa_max_replicas
 }
 
 output "redis_host" {
