@@ -150,25 +150,7 @@ resource "aws_ecr_lifecycle_policy" "app" {
   })
 }
 
-# ECR Pull Secret
-resource "kubernetes_secret" "ecr_secret" {
-  metadata {
-    name      = "ecr-secret"
-    namespace = kubernetes_namespace.app.metadata[0].name
-  }
-  
-  type = "kubernetes.io/dockerconfigjson"
-  
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "${aws_ecr_repository.app.repository_url}" = {
-          auth = base64encode("AWS:${data.aws_ecr_authorization_token.app.password}")
-        }
-      }
-    })
-  }
-}
+
 
 # ECR Authorization Token
 data "aws_ecr_authorization_token" "app" {
@@ -349,38 +331,13 @@ resource "kubernetes_config_map" "app" {
     LOG_FORMAT            = "json"
     HEALTH_CHECK_INTERVAL = "30"
     HEALTH_CHECK_TIMEOUT  = "5"
+    S3_BUCKET_NAME        = aws_s3_bucket.app.bucket
+    S3_REGION             = var.aws_region
+    AUTH_SERVICE_URL      = "https://mlpr641j1i.execute-api.us-east-1.amazonaws.com/v1/api"
   }
 }
 
-# Secret
-resource "kubernetes_secret" "app" {
-  metadata {
-    name      = "${var.app_name}-secret"
-    namespace = kubernetes_namespace.app.metadata[0].name
-  }
 
-  type = "Opaque"
-
-  data = {
-    DB_HOST                = replace(data.terraform_remote_state.database.outputs.db_endpoint, ":5432", "")
-    DB_PORT                = "5432"
-    DB_NAME                = data.terraform_remote_state.database.outputs.db_name
-    DB_USERNAME            = data.terraform_remote_state.database.outputs.db_username
-    DB_PASSWORD            = data.terraform_remote_state.database.outputs.db_password
-    RABBITMQ_HOST          = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name
-    RABBITMQ_PORT          = tostring(data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port)
-    RABBITMQ_USERNAME      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username
-    RABBITMQ_PASSWORD      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password
-    RABBITMQ_URL           = "amqp://${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password}@${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port}/"
-    AWS_REGION             = var.aws_region
-    AWS_COGNITO_USER_POOL_ID = var.aws_cognito_user_pool_id
-    AWS_COGNITO_CLIENT_ID    = var.aws_cognito_client_id
-    REDIS_HOST             = data.terraform_remote_state.redis.outputs.redis_host
-    REDIS_PORT             = tostring(data.terraform_remote_state.redis.outputs.redis_port)
-    REDIS_PASSWORD         = data.terraform_remote_state.redis.outputs.redis_password
-    REDIS_URL              = data.terraform_remote_state.redis.outputs.redis_connection_string
-  }
-}
 
 # Deployment
 resource "kubernetes_deployment" "app" {
@@ -536,6 +493,36 @@ resource "kubernetes_deployment" "app" {
               config_map_key_ref {
                 name = kubernetes_config_map.app.metadata[0].name
                 key  = "HEALTH_CHECK_TIMEOUT"
+              }
+            }
+          }
+
+          env {
+            name = "S3_BUCKET_NAME"
+            value_from {
+              config_map_key_ref {
+                name = kubernetes_config_map.app.metadata[0].name
+                key  = "S3_BUCKET_NAME"
+              }
+            }
+          }
+
+          env {
+            name = "S3_REGION"
+            value_from {
+              config_map_key_ref {
+                name = kubernetes_config_map.app.metadata[0].name
+                key  = "S3_REGION"
+              }
+            }
+          }
+
+          env {
+            name = "AUTH_SERVICE_URL"
+            value_from {
+              config_map_key_ref {
+                name = kubernetes_config_map.app.metadata[0].name
+                key  = "AUTH_SERVICE_URL"
               }
             }
           }
@@ -709,6 +696,36 @@ resource "kubernetes_deployment" "app" {
               secret_key_ref {
                 name = kubernetes_secret.app.metadata[0].name
                 key  = "REDIS_URL"
+              }
+            }
+          }
+
+          env {
+            name = "RABBITMQ_VHOST"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "RABBITMQ_VHOST"
+              }
+            }
+          }
+
+          env {
+            name = "GMAIL_USER"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "GMAIL_USER"
+              }
+            }
+          }
+
+          env {
+            name = "GMAIL_APP_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.app.metadata[0].name
+                key  = "GMAIL_APP_PASSWORD"
               }
             }
           }
