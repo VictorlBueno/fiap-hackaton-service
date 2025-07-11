@@ -59,6 +59,7 @@ jobs:
     name: Build e Push da Imagem Docker
     runs-on: ubuntu-latest
     needs: validar
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
       - name: Baixar código
@@ -95,10 +96,25 @@ jobs:
             image-tag.txt
           retention-days: 1
 
+  build-test:
+    name: Testar Build da Imagem Docker
+    runs-on: ubuntu-latest
+    needs: validar
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Build da imagem (sem push)
+        run: |
+          docker build -t fiap-hack-test:${{ github.sha }} .
+          echo "✅ Build da imagem realizado com sucesso!"
+
   plano:
     name: Gerar Plano de Mudanças
     runs-on: ubuntu-latest
-    needs: [validar, build]
+    needs: validar
     
     steps:
       - name: Baixar código
@@ -130,6 +146,7 @@ jobs:
         with:
           name: image-tag
           path: ./
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
       - name: Inicializar Terraform (reconfigure)
         working-directory: terraform
@@ -149,7 +166,7 @@ jobs:
   deploy:
     name: Aplicar Mudanças na Infraestrutura
     runs-on: ubuntu-latest
-    needs: [validar, build, plano]
+    needs: [validar, plano]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
