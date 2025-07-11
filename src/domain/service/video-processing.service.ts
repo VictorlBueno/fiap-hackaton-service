@@ -5,6 +5,7 @@ import { VideoProcessorPort } from '../ports/gateways/video-processor.port';
 import { FileStoragePort } from '../ports/gateways/file-storage.port';
 import { JobRepositoryPort } from '../ports/repositories/job-repository.port';
 import { EmailNotificationService } from './email-notification.service';
+import { MetricsService } from '../../infrastructure/adapters/services/metrics.service';
 import * as fs from 'fs/promises';
 
 @Injectable()
@@ -16,9 +17,13 @@ export class VideoProcessingService {
     @Inject('JobRepositoryPort')
     private readonly jobRepository: JobRepositoryPort,
     private readonly emailNotificationService: EmailNotificationService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async processVideo(video: Video, userSub: string): Promise<ProcessingJob | null> {
+    const startTime = Date.now();
+    const videoFormat = video.originalName.split('.').pop() || 'unknown';
+    
     await this.jobRepository.updateJobStatus(
       video.id,
       JobStatus.PROCESSING,
@@ -129,6 +134,10 @@ export class VideoProcessingService {
 
       const result = await this.jobRepository.findJobById(video.id, video.userId);
       
+      // Registrar métrica de processamento bem-sucedido
+      const processingDuration = (Date.now() - startTime) / 1000;
+      this.metricsService.recordVideoProcessingDuration('success', videoFormat, processingDuration);
+      
       if (result) {
         try {
           await this.emailNotificationService.notifyVideoProcessingComplete(result, userSub);
@@ -143,6 +152,10 @@ export class VideoProcessingService {
         `Erro no processamento para usuário ${video.userId}:`,
         error.message,
       );
+
+      // Registrar métrica de processamento falhado
+      const processingDuration = (Date.now() - startTime) / 1000;
+      this.metricsService.recordVideoProcessingDuration('failed', videoFormat, processingDuration);
 
       await this.jobRepository.updateJobStatus(
         video.id,

@@ -1,629 +1,339 @@
-# Docker Setup - Video Processor
-
-# Infraestrutura Terraform para ECR
-
-Este diretório contém a configuração Terraform para provisionar um repositório ECR (Elastic Container Registry) na AWS e a infraestrutura Kubernetes para deploy da aplicação. A infraestrutura está organizada seguindo o padrão dos outros projetos.
-
-## Estrutura
-
-```
-ecr/
-├── terraform/           # Configurações Terraform
-│   ├── main.tf         # Recursos principais
-│   ├── variables.tf    # Definição de variáveis
-│   ├── outputs.tf      # Outputs do módulo
-│   ├── providers.tf    # Configuração de providers
-│   └── terraform.tfvars # Valores das variáveis
-├── terraform/          # Configurações Terraform
-│   ├── main.tf         # Recursos principais
-│   ├── variables.tf    # Definição de variáveis
-│   ├── outputs.tf      # Outputs do módulo
-│   ├── providers.tf    # Configuração de providers
-│   └── k8s.tfvars      # Valores das variáveis
-├── scripts/            # Scripts de automação
-│   └── generate-secret.sh # Geração de secrets a partir do .env
-├── src/                # Código fonte da aplicação
-├── Dockerfile          # Imagem Docker para produção
-├── .dockerignore       # Arquivos ignorados no build
-├── env.example         # Exemplo de variáveis de ambiente
-├── Makefile           # Comandos de automação
-└── README.md          # Este arquivo
-```
-
-## Como usar
-
-1. Configure suas credenciais AWS (ex: via `aws configure` ou variáveis de ambiente).
-2. Execute os comandos usando o Makefile:
-   ```sh
-   make tf-init      # Inicializar Terraform
-   make tf-plan      # Verificar mudanças
-   make tf-apply     # Aplicar mudanças
-   make tf-output    # Ver outputs
-   ```
-
-## Variáveis
-
-As variáveis seguem o padrão dos outros projetos:
-- `aws_region`: Região AWS (padrão: us-east-1)
-- `environment`: Ambiente (padrão: production)
-- `project_name`: Nome do projeto (padrão: fiap-hack)
-- `force_delete`: Permite deletar repositório com imagens (padrão: false)
-
-O nome do repositório será: `{project_name}-{environment}` (ex: fiap-hack-production)
-
-## 🔧 Configuração do Ambiente
-
-### Configuração do .env
-Para fazer deploy no Kubernetes, você precisa configurar o arquivo `.env`:
-
-1. **Copie o arquivo de exemplo:**
-   ```bash
-   cp env.example .env
-   ```
-
-2. **Edite o arquivo `.env` com suas configurações:**
-   - **RDS**: Endpoint e credenciais do banco de dados
-   - **RabbitMQ**: Host e credenciais da fila
-   - **AWS**: Credenciais para S3 e outros serviços
-
-3. **Exemplo de configuração:**
-   ```bash
-   # RDS
-   DB_HOST=your-rds-endpoint.amazonaws.com
-   DB_PORT=5432
-   DB_NAME=fiaphack
-   DB_USERNAME=postgres
-   DB_PASSWORD=your-db-password
-   
-   # RabbitMQ
-   RABBITMQ_HOST=your-rabbitmq-host
-   RABBITMQ_PORT=5672
-   RABBITMQ_USERNAME=admin
-   RABBITMQ_PASSWORD=admin123
-   
-   # AWS
-   AWS_REGION=us-east-1
-   AWS_ACCESS_KEY_ID=your-access-key
-   AWS_SECRET_ACCESS_KEY=your-secret-key
-   ```
-
-## 🚀 Deploy ECR
-
-### Deploy Completo
-Para fazer deploy completo (ECR + Kubernetes):
-```bash
-make deploy
-```
-
-Este comando irá:
-1. ✅ Verificar pré-requisitos (AWS CLI, Docker)
-2. 🏗️ Aplicar infraestrutura Terraform (se necessário)
-3. 🐳 Build e push da imagem Docker para ECR
-4. ☸️ Opcional: Deploy no Kubernetes
-
-### Deploy ECR Apenas
-Para fazer deploy apenas no ECR:
-```bash
-make deploy-ecr
-```
-
-### Deploy Infraestrutura
-Para aplicar apenas a infraestrutura Terraform:
-```bash
-make deploy-infra
-```
-
-## ☸️ Kubernetes
-
-### Deploy no Kubernetes
-Para fazer deploy completo no Kubernetes:
-```bash
-make deploy
-```
-
-Este comando irá:
-1. ✅ Verificar kubectl e cluster
-2. 🔐 Buscar credenciais do Secrets Manager
-3. 📋 Aplicar todos os recursos Kubernetes via Terraform
-4. 📊 Verificar status do deploy
-
-**⚠️ Importante:** Certifique-se de que o RabbitMQ e Database estão funcionando antes de executar o deploy.
-
-### Comandos Kubernetes Disponíveis
-
-#### **Deploy e Gerenciamento:**
-- `terraform-apply` - Aplicar recursos Terraform
-- `terraform-destroy` - Remover recursos Terraform
-- `deploy` - Deploy completo (ECR + Kubernetes)
-- `deploy-k8s-only` - Apenas Kubernetes
-
-#### **Monitoramento:**
-- `k8s-status` - Verificar status dos recursos
-- `k8s-logs` - Ver logs dos pods
-- `k8s-describe` - Descrever recursos
-
-#### **Operações:**
-- `k8s-scale` - Escalar deployment
-- `k8s-restart` - Reiniciar deployment
-- `k8s-rollback` - Fazer rollback
-- `k8s-port-forward` - Port-forward para service
-
-### Recursos Kubernetes
-
-#### **Deployment:**
-- 2 réplicas inicialmente
-- Auto-scaling: 2-10 réplicas baseado em CPU (70%) e memória (80%)
-- Rolling update com zero downtime
-- Health checks configurados
-
-#### **Recursos:**
-- Requests: 256Mi RAM, 250m CPU
-- Limits: 512Mi RAM, 500m CPU
-
-#### **Networking:**
-- Service ClusterIP na porta 80
-- Ingress com Nginx para acesso externo
-- Host: video-processor.local
-
-#### **Armazenamento:**
-- Volumes temporários para uploads e outputs
-- Configuração para S3 (via AWS credentials)
-
-### Integração com Outros Projetos
-
-O arquivo `.env` deve conter as configurações dos outros projetos:
-- **RDS**: Endpoint, credenciais do banco
-- **RabbitMQ**: Host, credenciais da fila
-- **AWS**: Credenciais para S3 e outros serviços
-
-#### Configuração do .env:
-1. Copie o arquivo de exemplo: `cp env.example .env`
-2. Edite o arquivo `.env` com suas configurações
-3. Execute: `make deploy` para fazer deploy completo
-
-### Pré-requisitos para Deploy
-- AWS CLI configurado
-- Docker instalado e funcionando
-- kubectl configurado para o cluster correto
-- Permissões adequadas na AWS (ECR, EKS)
-- Cluster Kubernetes com Nginx Ingress Controller
-
-### ✅ Status Atual
-- ✅ Repositório ECR criado: `fiap-hack-production`
-- ✅ URL do ECR: `410211328905.dkr.ecr.us-east-1.amazonaws.com/fiap-hack-production`
-- ✅ Imagem Docker buildada e enviada com sucesso
-- ✅ Manifests Kubernetes criados
-- ✅ Scripts de automação configurados
-- ✅ Pronto para deploy no Kubernetes
-
-## 🚀 Início Rápido
-
-```bash
-# Subir todos os serviços
-make setup
-
-# Ou manualmente
-docker-compose up -d
-```
-
-## 📋 Serviços
-
-### PostgreSQL
-- **Porta**: 5432
-- **Database**: video_processor
-- **User**: postgres
-- **Password**: postgres123
-
-### RabbitMQ
-- **AMQP Port**: 5672
-- **Management UI**: http://localhost:15672
-- **User**: admin
-- **Password**: admin123
-
-## 🛠️ Comandos Úteis
-
-```bash
-# Ver todos os comandos disponíveis
-make help
-
-# Subir serviços
-make up
-
-# Ver logs
-make logs
-
-# Conectar no banco
-make db-shell
-
-# Abrir RabbitMQ UI
-make mq-ui
-
-# Parar tudo
-make down
-
-# Limpar volumes
-make clean
-```
-
-## 🔧 Configuração da Aplicação
-
-Certifique-se que o arquivo `.env` está configurado:
-
-```env
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=postgres123
-DB_NAME=video_processor
-
-# RabbitMQ Configuration
-RABBITMQ_URL=amqp://admin:admin123@localhost:5672
-
-# AWS S3 Configuration
-AWS_REGION=us-east-1
-AWS_S3_BUCKET_NAME=video-processor-bucket
-
-# JWT Configuration
-JWT_SECRET=your_jwt_secret_key
-```
-
-> **Nota:** Em ambiente AWS Lambda, não é necessário definir `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY`. O Lambda já assume uma role IAM com permissões apropriadas automaticamente.
-
-### 📦 Configuração do S3
-
-1. **Crie um bucket S3** na AWS
-2. **Configure as permissões da role do Lambda** para permitir upload/download
-3. **Configure as variáveis** no arquivo `.env` (veja acima)
-4. **Copie o arquivo de exemplo**: `cp env.example .env`
-
-## 🏥 Health Check
-
-```bash
-# Verificar se os serviços estão funcionando
-make health
-
-# Verificar status dos containers
-make ps
-```
-
-## 📊 Monitoramento
-
-- **PostgreSQL**: Use `make db-shell` para conectar
-- **RabbitMQ**: Acesse http://localhost:15672 para o painel de controle
-- **S3**: Verifique os arquivos no console da AWS S3
-
-## ☁️ Armazenamento S3
-
-O serviço agora utiliza o Amazon S3 para armazenamento de arquivos:
-
-- **Vídeos**: São enviados para o S3 após upload
-- **ZIPs**: Os arquivos ZIP com frames são criados no S3
-- **Downloads**: URLs assinadas são geradas para download seguro
-- **Limpeza**: Arquivos temporários são removidos automaticamente
-
-## 🧹 Limpeza
-
-```bash
-# Limpar pastas temporárias (uploads, outputs, temp)
-make cleanup
-
-# Parar e remover tudo (incluindo volumes)
-make clean
-```
-
-### 📁 Pastas Temporárias
-
-O projeto usa as seguintes pastas temporárias que são limpas automaticamente:
-
-- **`uploads/`**: Arquivos de vídeo temporários (enviados para S3)
-- **`outputs/`**: Arquivos ZIP temporários (enviados para S3)  
-- **`temp/`**: Frames extraídos temporários (removidos após processamento)
-
-> **Nota**: Use `make cleanup` para limpar manualmente essas pastas.
-
-## 🔍 Solução de Problemas
-
-### PostgreSQL não conecta
-```bash
-# Verificar logs
-make logs-db
-
-# Reiniciar serviço
-docker-compose restart postgres
-```
-
-# Video Processor - ECR e Kubernetes
-
-Este projeto contém a configuração para deploy do Video Processor no AWS ECR e Kubernetes usando Terraform.
-
-## 📋 Pré-requisitos
-
-- [AWS CLI](https://aws.amazon.com/cli/) configurado
-- [Docker](https://docker.com/) instalado
-- [Terraform](https://terraform.io/) instalado
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) configurado
-- Acesso ao cluster Kubernetes (EKS)
+# Service - Aplicação de Processamento de Vídeo
+
+Este módulo provisiona a aplicação principal de processamento de vídeo no Kubernetes (EKS) com integração com ECR, S3, e todos os serviços de infraestrutura.
+
+## 📋 Visão Geral
+
+A aplicação é configurada como um deployment no Kubernetes com:
+- **Containerização**: Imagem Docker no ECR
+- **Armazenamento**: S3 para uploads e outputs
+- **Autoscaling**: HPA (Horizontal Pod Autoscaler)
+- **Load Balancer**: Service do tipo LoadBalancer
+- **Integração**: RabbitMQ, Redis, PostgreSQL
+- **Monitoramento**: Health checks e métricas
 
 ## 🏗️ Arquitetura
 
-O projeto utiliza:
-- **AWS ECR**: Repositório de imagens Docker
-- **Kubernetes**: Orquestração de containers
-- **Terraform**: Infraestrutura como código
-- **RDS**: Banco de dados PostgreSQL
-- **RabbitMQ**: Message broker
-
-## 📁 Estrutura do Projeto
-
-```
-ecr/
-├── terraform/
-│   ├── main.tf              # Recursos ECR e Kubernetes
-│   ├── variables.tf         # Variáveis Terraform
-│   ├── outputs.tf           # Outputs Terraform
-│   ├── providers.tf         # Providers AWS e Kubernetes
-│   └── k8s.tfvars          # Valores das variáveis
-├── Dockerfile              # Imagem Docker da aplicação
-├── Makefile               # Comandos automatizados
-└── README.md              # Este arquivo
+```mermaid
+graph TB
+    subgraph "AWS EKS"
+        subgraph "Namespace: video-processor"
+            subgraph "Deployment"
+                POD1[Pod 1<br/>video-processor]
+                POD2[Pod 2<br/>video-processor]
+                POD3[Pod N<br/>video-processor]
+            end
+            
+            SERVICE[Service<br/>LoadBalancer]
+            HPA[HPA<br/>Autoscaling]
+            
+            subgraph "ConfigMaps"
+                CM_APP[App Config]
+                CM_DB[DB Init Config]
+            end
+            
+            subgraph "Secrets"
+                SEC_ECR[ECR Secret]
+                SEC_APP[App Secret]
+            end
+            
+            SA[Service Account<br/>IAM Role]
+        end
+    end
+    
+    subgraph "AWS Services"
+        ECR[ECR Repository<br/>fiap-hack-production]
+        S3[S3 Bucket<br/>fiap-hackaton-files-1]
+        IAM[IAM Role<br/>Service Account]
+    end
+    
+    subgraph "External Services"
+        RABBITMQ[RabbitMQ<br/>Message Queue]
+        REDIS[Redis<br/>State Cache]
+        POSTGRES[PostgreSQL<br/>Database]
+    end
+    
+    %% Connections
+    ECR --> POD1
+    ECR --> POD2
+    ECR --> POD3
+    
+    SERVICE --> POD1
+    SERVICE --> POD2
+    SERVICE --> POD3
+    
+    HPA --> POD1
+    HPA --> POD2
+    HPA --> POD3
+    
+    S3 --> POD1
+    S3 --> POD2
+    S3 --> POD3
+    
+    IAM --> SA
+    
+    RABBITMQ --> POD1
+    RABBITMQ --> POD2
+    RABBITMQ --> POD3
+    
+    REDIS --> POD1
+    REDIS --> POD2
+    REDIS --> POD3
+    
+    POSTGRES --> POD1
+    POSTGRES --> POD2
+    POSTGRES --> POD3
+    
+    %% Styling
+    classDef pod fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef service fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef config fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef aws fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef external fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    
+    class POD1,POD2,POD3 pod
+    class SERVICE,HPA service
+    class CM_APP,CM_DB,SEC_ECR,SEC_APP,SA config
+    class ECR,S3,IAM aws
+    class RABBITMQ,REDIS,POSTGRES external
 ```
 
 ## 🚀 Deploy
 
-### 1. Configuração Inicial
+### Pré-requisitos
 
-```bash
-# Inicializar Terraform
-make terraform-init
+- Cluster EKS configurado e funcionando
+- kubectl configurado para o cluster
+- AWS CLI configurado
+- Terraform instalado
+- Docker instalado
 
-# Verificar plano
-make terraform-plan
+### Deploy Automático (GitHub Actions)
+
+O deploy é executado automaticamente via GitHub Actions quando há push para a branch `main`:
+
+```yaml
+# .github/workflows/deploy.yml
+- Validação do Terraform
+- Build e push da imagem Docker para ECR
+- Geração do plano Terraform
+- Aplicação das mudanças no Kubernetes
+- Verificação do deployment
+- Teste de health check
 ```
 
-### 2. Deploy Completo
+### Deploy Manual
 
 ```bash
 # Deploy completo (ECR + Kubernetes)
 make deploy
-```
 
-### 3. Deploy Parcial
-
-```bash
-# Apenas ECR
+# Apenas build e push para ECR
 make deploy-ecr-only
 
-# Apenas Kubernetes
+# Apenas deploy no Kubernetes
 make deploy-k8s-only
+
+# Deploy completo incluindo criação do EKS
+make deploy-eks
 ```
-
-## 🔧 Comandos Disponíveis
-
-### Docker
-- `make build` - Construir imagem Docker
-- `make build-ecr` - Construir imagem para ECR
-- `make login-ecr` - Login no ECR
-- `make push-ecr` - Enviar imagem para ECR
-
-### Terraform
-- `make terraform-init` - Inicializar Terraform
-- `make terraform-plan` - Gerar plano Terraform
-- `make terraform-apply` - Aplicar configurações
-- `make terraform-destroy` - Destruir recursos
-- `make terraform-output` - Exibir outputs
-- `make terraform-fmt` - Formatar arquivos
-- `make terraform-validate` - Validar configuração
-
-### Kubernetes
-- `make k8s-status` - Status dos recursos
-- `make k8s-logs` - Logs da aplicação
-- `make k8s-describe` - Descrever recursos
-- `make k8s-port-forward` - Configurar port-forward
-- `make k8s-scale REPLICAS=3` - Escalar deployment
-- `make k8s-restart` - Reiniciar deployment
-- `make k8s-rollback` - Fazer rollback
-
-### Desenvolvimento
-- `make dev-build` - Build para desenvolvimento
-- `make dev-run` - Executar em desenvolvimento
-- `make dev-stop` - Parar containers de desenvolvimento
-
-### Limpeza
-- `make clean` - Limpar recursos Docker
-- `make clean-images` - Remover imagens Docker
-
-### Ajuda
-- `make help` - Exibir ajuda completa
 
 ## ⚙️ Configuração
 
-### Variáveis do Terraform
+### Variáveis Principais
 
-As variáveis são configuradas no arquivo `terraform/k8s.tfvars`:
-
-```hcl
-# Configurações do banco de dados
-db_host = "fiap-hack-production.cqjqjqjqjqjq.us-east-1.rds.amazonaws.com"
-db_port = "5432"
-db_name = "fiaphack"
-db_username = "postgres"
-db_password = "fiap-hack-2024!"
-
-# Configurações do RabbitMQ
-rabbitmq_host = "rabbitmq-service.rabbitmq.svc.cluster.local"
-rabbitmq_port = "5672"
-rabbitmq_username = "admin"
-rabbitmq_password = "admin123"
-
-# Configurações AWS
-aws_region = "us-east-1"
-aws_access_key_id = "AKIAIOSFODNN7EXAMPLE"
-aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-
-# Configurações da aplicação
-app_name = "video-processor"
-app_namespace = "video-processor"
-app_replicas = 2
-app_image = "410211328905.dkr.ecr.us-east-1.amazonaws.com/fiap-hack-production:latest"
-```
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `app_name` | Nome da aplicação | `video-processor` |
+| `app_namespace` | Namespace Kubernetes | `video-processor` |
+| `app_image` | Imagem Docker | `fiap-hack/video-processor:latest` |
+| `app_replicas` | Número de réplicas | `2` |
+| `aws_region` | Região AWS | `us-east-1` |
+| `environment` | Ambiente | `production` |
+| `project_name` | Nome do projeto | `fiap-hack` |
 
 ### Recursos Criados
 
-O Terraform cria os seguintes recursos:
+| Recurso | Quantidade | Descrição |
+|---------|------------|-----------|
+| ECR Repository | 1 | Repositório de imagens Docker |
+| S3 Bucket | 1 | Armazenamento de arquivos |
+| IAM Role | 1 | Permissões para Service Account |
+| Kubernetes Namespace | 1 | Namespace da aplicação |
+| Kubernetes Deployment | 1 | Deployment da aplicação |
+| Kubernetes Service | 1 | LoadBalancer |
+| Kubernetes HPA | 1 | Autoscaling |
+| ConfigMaps | 2 | Configurações da aplicação |
+| Secrets | 2 | Credenciais e secrets |
 
-1. **ECR Repository**: Repositório para imagens Docker
-2. **Kubernetes Namespace**: Namespace `video-processor`
-3. **ConfigMap**: Configurações da aplicação
-4. **Secret**: Credenciais sensíveis
-5. **Deployment**: Aplicação com 2 réplicas
-6. **Service**: ClusterIP para comunicação interna
-7. **Ingress**: Roteamento externo
-8. **HPA**: Auto-scaling baseado em CPU e memória
+## 🔧 Comandos Úteis
 
-## 🔍 Monitoramento
-
-### Verificar Status
+### Makefile
 
 ```bash
-# Status geral
-make k8s-status
+# Ajuda
+make help
+
+# Build e Deploy
+make build              # Build local
+make build-ecr          # Build para ECR
+make deploy             # Deploy completo
+make deploy-eks         # Deploy + criar EKS
+
+# ECR
+make login-ecr          # Login no ECR
+make push-ecr           # Push para ECR
+
+# Terraform
+make terraform-init     # Inicializar Terraform
+make terraform-plan     # Gerar plano
+make terraform-apply    # Aplicar mudanças
+make terraform-destroy  # Destruir recursos
+
+# Kubernetes
+make k8s-status         # Status dos recursos
+make k8s-logs           # Logs da aplicação
+make k8s-describe       # Descrever recursos
+make k8s-port-forward   # Port forward
+make k8s-scale          # Escalar deployment
+make k8s-restart        # Reiniciar deployment
+
+# Desenvolvimento
+make dev-build          # Build para desenvolvimento
+make dev-run            # Executar localmente
+make dev-stop           # Parar containers
+
+# Serviços
+make get-rabbitmq-credentials  # Credenciais RabbitMQ
+make get-rabbitmq-status       # Status RabbitMQ
+make get-service-url           # URL do LoadBalancer
+```
+
+### kubectl
+
+```bash
+# Ver pods da aplicação
+kubectl get pods -n video-processor
+
+# Ver services
+kubectl get svc -n video-processor
 
 # Logs da aplicação
-make k8s-logs
+kubectl logs -f deployment/video-processor -n video-processor
 
-# Descrição detalhada
-make k8s-describe
+# Descrever deployment
+kubectl describe deployment video-processor -n video-processor
+
+# Escalar deployment
+kubectl scale deployment video-processor --replicas=3 -n video-processor
+
+# Port forward
+kubectl port-forward service/video-processor-service 8080:80 -n video-processor
 ```
 
-### Port-Forward
+### AWS CLI
 
 ```bash
-# Acessar aplicação localmente
-make k8s-port-forward
+# Verificar ECR
+aws ecr describe-repositories --repository-names fiap-hack-production
+
+# Verificar S3
+aws s3 ls s3://fiap-hackaton-files-1
+
+# Verificar IAM Role
+aws iam get-role --role-name fiap-hack-production-service-account-role
 ```
 
-A aplicação estará disponível em `http://localhost:8080`
+## 🔗 Conectividade
+
+### LoadBalancer
+
+```bash
+# Obter URL do LoadBalancer
+kubectl get svc video-processor-service -n video-processor -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# Testar health check
+curl http://<loadbalancer-url>/health
+```
+
+### Port Forward (Desenvolvimento)
+
+```bash
+# Port forward para acesso local
+kubectl port-forward service/video-processor-service 8080:80 -n video-processor
+
+# Acessar localmente
+curl http://localhost:8080/health
+```
+
+## 🔒 Segurança
+
+### IAM Role
+
+A aplicação usa IAM Role para Service Account com permissões para:
+- **S3**: GetObject, PutObject, DeleteObject, ListBucket
+- **ECR**: GetAuthorizationToken, BatchCheckLayerAvailability, GetDownloadUrlForLayer
+
+### Secrets
+
+```bash
+# ECR Secret
+kubectl get secret ecr-secret -n video-processor
+
+# App Secret
+kubectl get secret app -n video-processor
+```
+
+## 📊 Monitoramento
+
+### Health Checks
+
+- **Liveness Probe**: HTTP GET `/health`
+- **Readiness Probe**: HTTP GET `/health`
+- **Initial Delay**: 30s (liveness), 5s (readiness)
+
+### Autoscaling
+
+```bash
+# Verificar HPA
+kubectl get hpa -n video-processor
+
+# Verificar métricas
+kubectl top pods -n video-processor
+```
+
+### Logs
+
+```bash
+# Logs da aplicação
+kubectl logs -f deployment/video-processor -n video-processor
+
+# Logs de um pod específico
+kubectl logs -f <pod-name> -n video-processor
+
+# Logs com timestamps
+kubectl logs --timestamps deployment/video-processor -n video-processor
+```
 
 ## 🔄 Atualizações
 
-### Atualizar Imagem
+### Rolling Update
 
 ```bash
-# Build e push da nova imagem
-make push-ecr
+# Atualizar imagem
+kubectl set image deployment/video-processor video-processor=novo-tag -n video-processor
 
-# Aplicar no Kubernetes
-make terraform-apply
+# Verificar rollout
+kubectl rollout status deployment/video-processor -n video-processor
+
+# Rollback se necessário
+kubectl rollout undo deployment/video-processor -n video-processor
 ```
 
-### Escalar Aplicação
+### Terraform
 
 ```bash
-# Escalar para 5 réplicas
-make k8s-scale REPLICAS=5
+# Atualizar configuração
+cd terraform && terraform plan
+cd terraform && terraform apply
 ```
-
-## 🧹 Limpeza
-
-### Remover Recursos
-
-```bash
-# Destruir infraestrutura
-make terraform-destroy
-
-# Limpar imagens Docker
-make clean-images
-```
-
-## 🔐 Segurança
-
-- Credenciais sensíveis são armazenadas em Kubernetes Secrets
-- Configurações não-sensíveis em ConfigMaps
-- Acesso ao ECR via IAM roles
-- Rede isolada no Kubernetes
-
-## 📊 Recursos
-
-### Limites de Recursos
-
-- **CPU**: 250m request, 500m limit
-- **Memória**: 256Mi request, 512Mi limit
-
-### Auto-Scaling
-
-- **Mínimo**: 2 réplicas
-- **Máximo**: 10 réplicas
-- **Target CPU**: 70%
-- **Target Memory**: 80%
-
-## 🆘 Troubleshooting
-
-### Problemas Comuns
-
-1. **Erro de login no ECR**
-   ```bash
-   make login-ecr
-   ```
-
-2. **Pods não iniciam**
-   ```bash
-   make k8s-describe
-   make k8s-logs
-   ```
-
-3. **Imagem não encontrada**
-   ```bash
-   make push-ecr
-   make terraform-apply
-   ```
-
-4. **Recursos não criados**
-   ```bash
-   make terraform-plan
-   make terraform-apply
-```
-
-### Logs e Debug
-
-```bash
-# Logs da aplicação
-make k8s-logs
-
-# Status dos pods
-kubectl get pods -n video-processor
-
-# Descrição do deployment
-kubectl describe deployment video-processor -n video-processor
-```
-
-## 📞 Suporte
-
-Para dúvidas ou problemas:
-1. Verifique os logs: `make k8s-logs`
-2. Consulte a documentação do Terraform
-3. Verifique a configuração no `k8s.tfvars`
-
-## Configuração do Redis
-
-Adicione as seguintes variáveis de ambiente no seu arquivo `.env`:
-
-```
-REDIS_HOST=redis
-REDIS_PORT=6379
-# REDIS_PASSWORD=
-```
-
-Esses valores já funcionam para o ambiente local com Docker Compose. Para produção, ajuste conforme necessário.
-
-## Como subir o Redis com Docker Compose
-
-O Redis já está incluído no arquivo `docker-compose.yml` do projeto. Para subir o Redis junto com os demais serviços, basta executar:
-
-```
-docker-compose up -d
-```
-
-Isso irá iniciar o Redis, Postgres, RabbitMQ e o serviço principal na rede interna do compose.
-
-Para produção, utilize uma configuração equivalente, garantindo que as variáveis de ambiente estejam corretas e o serviço Redis esteja acessível para o backend.
