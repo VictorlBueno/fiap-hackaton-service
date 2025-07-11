@@ -116,6 +116,7 @@ jobs:
     name: Gerar Plano de Mudanças
     runs-on: ubuntu-latest
     needs: validar
+    if: github.event_name == 'pull_request'
     
     steps:
       - name: Baixar código
@@ -164,10 +165,63 @@ jobs:
           path: terraform/service.tfplan
           retention-days: 1
 
+  plano-main:
+    name: Gerar Plano de Mudanças (Main)
+    runs-on: ubuntu-latest
+    needs: [validar, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Instalar kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configurar kubectl para EKS
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Configurar provider AWS
+        working-directory: terraform
+        run: |
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          export AWS_DEFAULT_REGION=${{ env.AWS_REGION }}
+
+      - name: Inicializar Terraform (reconfigure)
+        working-directory: terraform
+        run: terraform init -reconfigure
+
+      - name: Gerar plano
+        working-directory: terraform
+        run: terraform plan -out=service.tfplan
+
+      - name: Salvar plano
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-tfplan-main
+          path: terraform/service.tfplan
+          retention-days: 1
+
   deploy:
     name: Aplicar Mudanças na Infraestrutura
     runs-on: ubuntu-latest
-    needs: [validar, plano]
+    needs: [validar, build, plano-main]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
@@ -205,7 +259,7 @@ jobs:
       - name: Baixar plano
         uses: actions/download-artifact@v4
         with:
-          name: service-tfplan
+          name: service-tfplan-main
           path: terraform/
 
       - name: Inicializar Terraform (reconfigure)
