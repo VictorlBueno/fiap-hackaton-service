@@ -1,9 +1,6 @@
 -- Inicialização do banco de dados
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Remover tabela antiga se existir
-DROP TABLE IF EXISTS processing_results;
-
 -- Tabela principal para jobs de processamento
 CREATE TABLE IF NOT EXISTS processing_jobs (
                                                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

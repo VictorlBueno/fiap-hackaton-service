@@ -108,7 +108,7 @@ export class RabbitMQQueueAdapter
 
   private async connect(): Promise<void> {
     try {
-      const url = process.env.RABBITMQ_URL!;
+      const url = process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq:5672';
       console.log('Conectando ao RabbitMQ...');
 
       this.connection = await amqp.connect(url);
