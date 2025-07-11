@@ -30,8 +30,8 @@ export default class Format {
           ? `/download/${job.zipPath}`
           : null,
       createdAt: job.createdAt.toISOString(),
-      updatedAt: job.createdAt.toISOString(),
-      duration: this.formatDuration(job.createdAt),
+      updatedAt: job.updatedAt ? job.updatedAt.toISOString() : job.createdAt.toISOString(),
+      duration: this.formatDuration(job.updatedAt || job.createdAt),
       canDownload: job.status === 'completed' && !!job.zipPath,
     }));
   }

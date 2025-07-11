@@ -23,12 +23,14 @@ export class S3StorageAdapter implements FileStoragePort {
 
   async deleteFile(filePath: string): Promise<void> {
     try {
-      if (filePath.startsWith('uploads/') || filePath.startsWith('temp/')) {
+      // Se for um arquivo temporário ou local
+      if (filePath.startsWith('/tmp/') || filePath.startsWith('temp/') || filePath.startsWith('uploads/')) {
         await fs.unlink(filePath);
         console.log(`Arquivo local removido: ${filePath}`);
         return;
       }
 
+      // Se for um arquivo S3
       const key = this.getS3Key(filePath);
       await this.s3Client.send(
         new DeleteObjectCommand({
@@ -45,30 +47,12 @@ export class S3StorageAdapter implements FileStoragePort {
   async createZip(files: string[], outputPath: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        const tempZipPath = `/tmp/${path.basename(outputPath)}`;
-        const output = fsSync.createWriteStream(tempZipPath);
+        const output = fsSync.createWriteStream(outputPath);
         const archive = archiver('zip', { zlib: { level: 9 } });
 
         output.on('close', async () => {
-          try {
-            const zipBuffer = await fs.readFile(tempZipPath);
-            const s3Key = `outputs/${path.basename(outputPath)}`;
-            
-            await this.s3Client.send(
-              new PutObjectCommand({
-                Bucket: s3Config.bucketName,
-                Key: s3Key,
-                Body: zipBuffer,
-                ContentType: 'application/zip',
-              })
-            );
-
-            await fs.unlink(tempZipPath);
-            console.log(`ZIP criado e enviado para S3: ${s3Key}`);
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
+          console.log(`📦 ZIP criado localmente: ${outputPath} (${archive.pointer()} bytes)`);
+          resolve();
         });
 
         archive.on('error', (err) => reject(err));
@@ -101,18 +85,21 @@ export class S3StorageAdapter implements FileStoragePort {
 
   async fileExists(filePath: string): Promise<boolean> {
     try {
-      if (filePath.startsWith('uploads/') && filePath.includes('T')) {
+      // Se for um arquivo temporário ou local
+      if (filePath.startsWith('/tmp/') || filePath.startsWith('temp/')) {
         await fs.access(filePath);
         console.log(`✅ Arquivo local encontrado: ${filePath}`);
         return true;
       }
       
-      if (filePath.startsWith('temp/')) {
+      // Se for um arquivo de upload local (com timestamp)
+      if (filePath.startsWith('uploads/') && filePath.includes('T')) {
         await fs.access(filePath);
         console.log(`✅ Arquivo local encontrado: ${filePath}`);
         return true;
       }
 
+      // Se for um arquivo S3
       const key = this.getS3Key(filePath);
       console.log(`🔍 Verificando existência no S3: ${key}`);
       

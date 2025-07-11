@@ -17,8 +17,9 @@ export class AuthServiceAdapter {
 
   async getUserEmail(userSub: string): Promise<string | null> {
     try {
+      console.log(`${this.authServiceUrl}/v1/users/${userSub}/email`)
       const response = await axios.get<AuthServiceResponse>(
-        `${this.authServiceUrl}/api/v1/users/${userSub}/email`,
+        `${this.authServiceUrl}/v1/users/${userSub}/email`,
         {
           timeout: 5000,
         }

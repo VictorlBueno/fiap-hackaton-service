@@ -14,8 +14,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { diskStorage } from 'multer';
 import { UploadResponse } from '../../../application/ports/controllers/video-upload.port';
-import * as path from 'path';
-import * as fs from 'fs/promises';
 import { UploadVideoUseCase } from '../../../application/usecases/upload-video.usecase';
 import { GetJobStatusUseCase } from '../../../application/usecases/get-job-status.usecase';
 import { ListAllJobsUseCase } from '../../../application/usecases/list-all-job-usecase';
@@ -81,7 +79,22 @@ export class VideoController {
       return { error: 'Job não encontrado ou não pertence ao usuário' };
     }
 
-    return job;
+    return {
+      id: job.id,
+      videoName: job.videoName,
+      status: job.status,
+      message: job.message,
+      frameCount: job.frameCount,
+      zipFilename: job.zipPath,
+      downloadUrl:
+        job.status === 'completed' && job.zipPath
+          ? `/download/${job.zipPath}`
+          : null,
+      createdAt: job.createdAt.toISOString(),
+      updatedAt: job.updatedAt ? job.updatedAt.toISOString() : job.createdAt.toISOString(),
+      duration: Format.formatDuration(job.updatedAt || job.createdAt),
+      canDownload: job.status === 'completed' && !!job.zipPath,
+    };
   }
 
   @Get('download/:filename')

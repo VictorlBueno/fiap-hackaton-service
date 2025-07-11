@@ -20,6 +20,7 @@ export class RedisJobRepositoryAdapter implements JobRepositoryPort {
       const key = this.getJobKey(job.id, job.userId);
       await this.redis.set(key, JSON.stringify(job));
       await this.redis.sadd(this.getUserJobsKey(job.userId), job.id);
+      console.log(`✅ Job salvo no Redis: ${job.id} - ${job.status} (usuário: ${job.userId})`);
     }
   }
 
@@ -37,6 +38,7 @@ export class RedisJobRepositoryAdapter implements JobRepositoryPort {
       const job = await this.findJobById(id, userId);
       if (job) jobs.push(job);
     }
+    console.log(`Retornados ${jobs.length} jobs do Redis para usuário ${userId}`);
     return jobs;
   }
 
@@ -74,7 +76,8 @@ export class RedisJobRepositoryAdapter implements JobRepositoryPort {
 
   private deserializeJob(data: string): ProcessingJob {
     const obj = JSON.parse(data);
-    return new ProcessingJob(
+    
+    const job = new ProcessingJob(
       obj.id,
       obj.videoName,
       obj.status,
@@ -85,5 +88,7 @@ export class RedisJobRepositoryAdapter implements JobRepositoryPort {
       obj.createdAt ? new Date(obj.createdAt) : undefined,
       obj.updatedAt ? new Date(obj.updatedAt) : undefined,
     );
+    
+    return job;
   }
 } 

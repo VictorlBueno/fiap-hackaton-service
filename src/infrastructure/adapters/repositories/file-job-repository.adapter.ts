@@ -77,6 +77,7 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
         row.frame_count,
         row.zip_filename,
         row.created_at,
+        row.updated_at,
       );
     } catch (error) {
       console.error('Erro ao buscar job no PostgreSQL:', error.message);
@@ -150,6 +151,7 @@ export class PostgresJobRepositoryAdapter implements JobRepositoryPort {
             row.frame_count,
             row.zip_filename,
             row.created_at,
+            row.updated_at,
           ),
       );
 

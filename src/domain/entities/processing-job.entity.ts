@@ -190,4 +190,18 @@ export class ProcessingJob {
   isFailed(): boolean {
     return this.status === JobStatus.FAILED;
   }
+
+  toJSON() {
+    return {
+      id: this.id,
+      videoName: this._videoName,
+      status: this._status,
+      message: this._message,
+      userId: this._userId,
+      frameCount: this._frameCount,
+      zipPath: this._zipPath,
+      createdAt: this._createdAt,
+      updatedAt: this._updatedAt,
+    };
+  }
 }
