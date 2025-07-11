@@ -66,7 +66,7 @@ resource "aws_ecr_repository" "app" {
 
 # S3 Bucket para uploads
 resource "aws_s3_bucket" "app" {
-  bucket = "fiap-hackaton-v"
+  bucket = "fiap-hackaton-files-1"
   
   tags = local.tags
 }
@@ -109,6 +109,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "app" {
       noncurrent_days = 7
     }
   }
+}
+
+# S3 Objects para criar pastas
+resource "aws_s3_object" "uploads_folder" {
+  bucket = aws_s3_bucket.app.id
+  key    = "uploads/"
+  source = "/dev/null"
+  
+  tags = local.tags
+}
+
+resource "aws_s3_object" "outputs_folder" {
+  bucket = aws_s3_bucket.app.id
+  key    = "outputs/"
+  source = "/dev/null"
+  
+  tags = local.tags
 }
 
 # ECR Lifecycle Policy
