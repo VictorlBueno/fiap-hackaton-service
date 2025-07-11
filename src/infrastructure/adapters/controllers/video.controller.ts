@@ -20,6 +20,7 @@ import { ListAllJobsUseCase } from '../../../application/usecases/list-all-job-u
 import { AuthenticatedRequest } from '../../middleware/jwt-auth.middleware';
 import Format from '../utils/format';
 import { FileStoragePort } from '../../../domain/ports/gateways/file-storage.port';
+import { MetricsService } from '../services/metrics.service';
 import {
   DownloadFileSwagger,
   GetJobStatusSwagger,
@@ -36,6 +37,7 @@ export class VideoController {
     private readonly getJobStatusUseCase: GetJobStatusUseCase,
     private readonly listAllJobsUseCase: ListAllJobsUseCase,
     @Inject('FileStoragePort') private readonly fileStorage: FileStoragePort,
+    private readonly metricsService: MetricsService,
   ) {}
 
   @Post('upload')
@@ -57,9 +59,26 @@ export class VideoController {
   ): Promise<UploadResponse> {
     try {
       console.log(`📤 Upload do usuário: ${req.userId} (${req.userEmail})`);
-      return await this.uploadVideoUseCase.execute(file, req.userId, req.userEmail);
+      
+      // Registrar métrica de upload
+      this.metricsService.incrementVideoUpload('started', req.userId);
+      
+      const result = await this.uploadVideoUseCase.execute(file, req.userId, req.userEmail);
+      
+      // Registrar métrica de sucesso/falha
+      if (result.success) {
+        this.metricsService.incrementVideoUpload('success', req.userId);
+      } else {
+        this.metricsService.incrementVideoUpload('failed', req.userId);
+      }
+      
+      return result;
     } catch (error) {
       console.error('❌ Erro no upload:', error.message);
+      
+      // Registrar métrica de erro
+      this.metricsService.incrementVideoUpload('error', req.userId);
+      
       return {
         success: false,
         message: `Erro interno: ${error.message}`,
@@ -144,6 +163,13 @@ export class VideoController {
 
       const summary = this.calculateSummary(jobs);
       const formattedJobs = Format.formatJobs(jobs);
+
+      // Atualizar métricas de jobs
+      this.metricsService.setActiveJobs('pending', summary.pending);
+      this.metricsService.setActiveJobs('processing', summary.processing);
+      this.metricsService.setActiveJobs('completed', summary.completed);
+      this.metricsService.setActiveJobs('failed', summary.failed);
+      this.metricsService.setProcessingJobs(summary.processing);
 
       return {
         jobs: formattedJobs,

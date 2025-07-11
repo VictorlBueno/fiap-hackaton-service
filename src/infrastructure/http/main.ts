@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import { AppModule } from '../modules/app.module';
+import { MetricsInterceptor } from '../adapters/interceptors/metrics.interceptor';
+import { MetricsService } from '../adapters/services/metrics.service';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -15,6 +17,10 @@ async function bootstrap() {
 
   console.log('🚀 Iniciando aplicação com Arquitetura Hexagonal...');
   const app = await NestFactory.create(AppModule);
+
+  // Configurar interceptor global de métricas
+  const metricsService = app.get(MetricsService);
+  app.useGlobalInterceptors(new MetricsInterceptor(metricsService));
 
   const config = new DocumentBuilder()
     .setTitle('Video Processor API - Hexagonal Architecture')

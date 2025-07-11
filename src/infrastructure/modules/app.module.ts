@@ -3,6 +3,7 @@ import {MulterModule} from '@nestjs/platform-express';
 import {ServeStaticModule} from '@nestjs/serve-static';
 import {join} from 'path';
 import {VideoController} from "../adapters/controllers/video.controller";
+import {MetricsController} from "../adapters/controllers/metrics.controller";
 import {GetJobStatusUseCase} from "../../application/usecases/get-job-status.usecase";
 import {UploadVideoUseCase} from "../../application/usecases/upload-video.usecase";
 import {VideoProcessingService} from "../../domain/service/video-processing.service";
@@ -20,6 +21,7 @@ import {GmailEmailProviderAdapter} from "../adapters/gateways/gmail-email-provid
 import {AuthServiceAdapter} from "../adapters/gateways/auth-service.adapter";
 import { RedisJobRepositoryAdapter } from "../adapters/gateways/redis.adapter";
 import { CompositeJobRepositoryAdapter } from "../adapters/gateways/composite-job-repository.adapter";
+import { MetricsService } from "../adapters/services/metrics.service";
 
 @Module({
     imports: [
@@ -39,6 +41,7 @@ import { CompositeJobRepositoryAdapter } from "../adapters/gateways/composite-jo
 
     controllers: [
         VideoController,
+        MetricsController,
     ],
 
     providers: [
@@ -82,6 +85,7 @@ import { CompositeJobRepositoryAdapter } from "../adapters/gateways/composite-jo
             useClass: GmailEmailProviderAdapter,
         },
         GmailEmailProviderAdapter,
+        MetricsService,
     ],
 })
 
