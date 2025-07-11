@@ -195,6 +195,7 @@ jobs:
       - name: Configurar kubectl para EKS
         run: |
           aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          kubectl get nodes || echo "Cluster ainda não está pronto"
 
       - name: Configurar provider AWS
         working-directory: terraform

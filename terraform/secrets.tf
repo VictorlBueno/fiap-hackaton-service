@@ -1,3 +1,12 @@
+# Data source para buscar credenciais do RabbitMQ
+data "aws_secretsmanager_secret_version" "rabbitmq_credentials" {
+  secret_id = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_secret_arn
+}
+
+locals {
+  rabbitmq_credentials = jsondecode(data.aws_secretsmanager_secret_version.rabbitmq_credentials.secret_string)
+}
+
 # Secret para credenciais ECR
 resource "kubernetes_secret" "ecr_secret" {
   metadata {
@@ -40,11 +49,11 @@ resource "kubernetes_secret" "app" {
     DB_PASSWORD            = data.terraform_remote_state.database.outputs.db_password
     
     # RabbitMQ
-    RABBITMQ_HOST          = "${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name}.${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_namespace}.svc.cluster.local"
-    RABBITMQ_PORT          = tostring(data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port)
-    RABBITMQ_USERNAME      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username
-    RABBITMQ_PASSWORD      = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password
-    RABBITMQ_URL           = "amqp://${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_username}:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_password}@${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_service_name}.${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_namespace}.svc.cluster.local:${data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_port}/"
+    RABBITMQ_HOST          = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_private_ip
+    RABBITMQ_PORT          = "5672"
+    RABBITMQ_USERNAME      = local.rabbitmq_credentials.username
+    RABBITMQ_PASSWORD      = local.rabbitmq_credentials.password
+    RABBITMQ_URL           = data.terraform_remote_state.rabbitmq.outputs.rabbitmq_amqp_url
     RABBITMQ_VHOST         = "/"
     
     # AWS
