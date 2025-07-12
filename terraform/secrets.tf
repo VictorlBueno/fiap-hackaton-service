@@ -68,7 +68,7 @@ resource "kubernetes_secret" "app" {
     REDIS_URL              = data.terraform_remote_state.redis.outputs.redis_connection_string
     
     # Gmail (para notificações)
-    GMAIL_USER             = "your-email@gmail.com"
-    GMAIL_APP_PASSWORD     = "your-gmail-app-password"
+    GMAIL_USER             = "vihbuenoz@gmail.com"
+    GMAIL_APP_PASSWORD     = "jeqs gjqu urkd udmi"
   }
 } 

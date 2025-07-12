@@ -16,6 +16,7 @@ describe('VideoController - Unit Tests', () => {
   let mockListAllJobsUseCase: jest.Mocked<ListAllJobsUseCase>;
   let mockFileStorage: jest.Mocked<FileStoragePort>;
   let mockResponse: jest.Mocked<Response>;
+  let mockMetricsService: any;
 
   const mockAuthenticatedRequest: AuthenticatedRequest = {
     userId: 'user-123',
@@ -71,6 +72,12 @@ describe('VideoController - Unit Tests', () => {
       pipe: jest.fn().mockReturnThis(),
     } as any;
 
+    mockMetricsService = {
+      incrementVideoUpload: jest.fn(),
+      setActiveJobs: jest.fn(),
+      setProcessingJobs: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VideoController],
       providers: [
@@ -89,6 +96,10 @@ describe('VideoController - Unit Tests', () => {
         {
           provide: 'FileStoragePort',
           useValue: mockFileStorage,
+        },
+        {
+          provide: 'MetricsService',
+          useValue: mockMetricsService,
         },
       ],
     }).compile();

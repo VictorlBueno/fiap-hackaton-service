@@ -10,6 +10,7 @@ describe('VideoProcessingService', () => {
   let mockFileStorage: any;
   let mockJobRepository: any;
   let mockEmailNotificationService: any;
+  let mockMetricsService: any;
 
   const mockVideo = new Video(
     'job-123',
@@ -55,6 +56,10 @@ describe('VideoProcessingService', () => {
       notifyVideoProcessingComplete: jest.fn(),
     };
 
+    mockMetricsService = {
+      recordVideoProcessingDuration: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VideoProcessingService,
@@ -73,6 +78,10 @@ describe('VideoProcessingService', () => {
         {
           provide: EmailNotificationService,
           useValue: mockEmailNotificationService,
+        },
+        {
+          provide: 'MetricsService',
+          useValue: mockMetricsService,
         },
       ],
     }).compile();

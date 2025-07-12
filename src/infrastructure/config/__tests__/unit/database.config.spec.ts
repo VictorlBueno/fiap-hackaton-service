@@ -26,13 +26,13 @@ describe('Database Configuration', () => {
         expect(result).toBe(mockPoolInstance);
         expect(mockPool).toHaveBeenCalledWith({
           host: 'localhost',
-          port: 5433,
+          port: 5432,
           user: 'postgres',
           password: 'postgres123',
           database: 'video_processor',
           max: 20,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
+          connectionTimeoutMillis: 30000,
         });
       });
     });
@@ -59,7 +59,7 @@ describe('Database Configuration', () => {
           database: 'custom-database',
           max: 20,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
+          connectionTimeoutMillis: 30000,
         });
       });
     });
@@ -77,13 +77,13 @@ describe('Database Configuration', () => {
         expect(result).toBe(mockPoolInstance);
         expect(mockPool).toHaveBeenCalledWith({
           host: 'partial-host',
-          port: 5433,
+          port: 5432,
           user: 'partial-user',
           password: 'postgres123',
           database: 'video_processor',
           max: 20,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
+          connectionTimeoutMillis: 30000,
         });
       });
     });
@@ -100,7 +100,7 @@ describe('Database Configuration', () => {
         expect(result).toBe(mockPoolInstance);
         expect(mockPool).toHaveBeenCalledWith(
           expect.objectContaining({
-            port: 5433,
+            port: 5432,
           })
         );
       });
@@ -116,7 +116,7 @@ describe('Database Configuration', () => {
         expect(result).toBe(mockPoolInstance);
         expect(mockPool).toHaveBeenCalledWith(
           expect.objectContaining({
-            port: 5433,
+            port: 5432,
           })
         );
       });
@@ -138,13 +138,13 @@ describe('Database Configuration', () => {
         expect(result).toBe(mockPoolInstance);
         expect(mockPool).toHaveBeenCalledWith({
           host: 'localhost',
-          port: 5433,
+          port: 5432,
           user: 'postgres',
           password: 'postgres123',
           database: 'video_processor',
           max: 20,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
+          connectionTimeoutMillis: 30000,
         });
       });
     });
@@ -161,7 +161,7 @@ describe('Database Configuration', () => {
           expect.objectContaining({
             max: 20,
             idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 2000,
+            connectionTimeoutMillis: 30000,
           })
         );
       });
