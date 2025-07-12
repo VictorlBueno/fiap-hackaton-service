@@ -36,62 +36,6 @@ DROP TRIGGER IF EXISTS update_processing_jobs_updated_at ON processing_jobs;
             FOR EACH ROW
             EXECUTE FUNCTION update_updated_at_column();
 
--- Inserir dados de exemplo para diferentes usuários (opcional para desenvolvimento)
-INSERT INTO processing_jobs (
-    id,
-    user_id,
-    video_name,
-    status,
-    message,
-    frame_count,
-    zip_filename,
-    created_at
-) VALUES
-      (
-          uuid_generate_v4(),
-          '54282418-a061-70d7-e35a-5d5603eaeb4c'::UUID,
-          'video_exemplo.mp4',
-          'completed',
-          'Processamento de exemplo concluído! 120 frames extraídos.',
-          120,
-          concat(uuid_generate_v4()::text, '.zip'),
-          NOW() - INTERVAL '1 hour'
-      ),
-      (
-          uuid_generate_v4(),
-          '12345678-1234-1234-1234-123456789012'::UUID,
-          'outro_video.mp4',
-          'completed',
-          'Processamento concluído! 85 frames extraídos.',
-          85,
-          concat(uuid_generate_v4()::text, '.zip'),
-          NOW() - INTERVAL '30 minutes'
-      ),
-      (
-          uuid_generate_v4(),
-          '54282418-a061-70d7-e35a-5d5603eaeb4c'::UUID,
-          'video_falhado.mp4',
-          'failed',
-          'Erro no processamento: FFmpeg não encontrado',
-          NULL,
-          NULL,
-          NOW() - INTERVAL '15 minutes'
-      ) ON CONFLICT (id) DO NOTHING;
-
--- View para estatísticas (opcional)
-CREATE OR REPLACE VIEW processing_stats AS
-SELECT
-    user_id,
-    COUNT(*) as total_jobs,
-    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_jobs,
-    COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_jobs,
-    COUNT(CASE WHEN status = 'processing' THEN 1 END) as processing_jobs,
-    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_jobs,
-    AVG(CASE WHEN status = 'completed' THEN frame_count END) as avg_frames,
-    MAX(created_at) as last_job_at
-FROM processing_jobs
-GROUP BY user_id;
-
 -- Comentários para documentação
 COMMENT ON TABLE processing_jobs IS 'Tabela principal para armazenar jobs de processamento de vídeo';
 COMMENT ON COLUMN processing_jobs.id IS 'ID único do job (UUID)';
@@ -105,7 +49,7 @@ COMMENT ON COLUMN processing_jobs.zip_filename IS 'Nome do arquivo ZIP gerado (U
 COMMENT ON COLUMN processing_jobs.created_at IS 'Data/hora de criação do job';
 COMMENT ON COLUMN processing_jobs.updated_at IS 'Data/hora da última atualização';
 
--- Função para cleanup de jobs antigos (opcional)
+-- Função para cleanup de jobs antigos
 CREATE OR REPLACE FUNCTION cleanup_old_jobs(days_old INTEGER DEFAULT 30)
 RETURNS INTEGER AS $$
 DECLARE

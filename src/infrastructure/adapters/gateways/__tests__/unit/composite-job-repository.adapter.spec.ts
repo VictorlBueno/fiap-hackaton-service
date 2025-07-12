@@ -66,7 +66,7 @@ describe('CompositeJobRepositoryAdapter', () => {
       redisRepo.getAllJobsByUser.mockResolvedValueOnce(redisJobs);
       postgresRepo.getAllJobsByUser.mockResolvedValueOnce(pgJobs);
       const result = await adapter.getAllJobsByUser('user5');
-      expect(result).toEqual([...redisJobs, ...pgJobs]);
+      expect(result).toEqual([...pgJobs, ...redisJobs]);
     });
   });
 
