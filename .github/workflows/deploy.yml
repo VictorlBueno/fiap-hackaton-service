@@ -37,17 +37,14 @@ jobs:
       - name: Executar testes com coverage
         run: |
           echo "🧪 Executando testes..."
-          npm run test:cov -- --silent --no-coverage-reporters=text
+          TEST_OUTPUT=$(npm run test:cov -- --silent --no-coverage-reporters=text 2>&1)
+          echo "$TEST_OUTPUT"
           echo ""
           echo "📊 Resumo dos testes:"
-          npm run test:cov -- --silent --no-coverage-reporters=text 2>&1 | grep -E "(PASS|FAIL|Tests:|✓|✗)" || true
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
+          echo "$TEST_OUTPUT" | grep -E "(PASS|FAIL|Tests:|✓|✗)" || true
+          echo ""
+          echo "📋 Resumo BDD dos Testes:"
+          echo "$TEST_OUTPUT" | grep -E "(describe|it|should|expect|Given|When|Then)" | head -20 || echo "Nenhum padrão BDD encontrado na saída dos testes"
 
   validar:
     name: Validar Terraform
