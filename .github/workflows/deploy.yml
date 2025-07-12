@@ -23,9 +23,48 @@ env:
   ECR_REPOSITORY: 410211328905.dkr.ecr.us-east-1.amazonaws.com/fiap-hack-production
 
 jobs:
+  test:
+    name: Executar Testes com Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm install --legacy-peer-deps
+
+      - name: Executar testes com coverage
+        run: npm run test:cov
+
+      - name: Verificar cobertura mínima
+        run: |
+          COVERAGE=$(npm run test:cov 2>&1 | grep -o "All files[^%]*" | grep -o "[0-9]*\.[0-9]*" | head -1)
+          echo "Cobertura atual: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "❌ Cobertura de testes abaixo de 80% (atual: $COVERAGE%)"
+            exit 1
+          else
+            echo "✅ Cobertura de testes OK: $COVERAGE%"
+          fi
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
   validar:
     name: Validar Terraform
     runs-on: ubuntu-latest
+    needs: test
     
     steps:
       - name: Baixar código
@@ -65,7 +104,7 @@ jobs:
   build:
     name: Build e Push da Imagem Docker
     runs-on: ubuntu-latest
-    needs: validar
+    needs: [test, validar]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
@@ -95,12 +134,10 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-
-
   build-test:
     name: Testar Build da Imagem Docker
     runs-on: ubuntu-latest
-    needs: validar
+    needs: [test, validar]
     if: github.event_name == 'pull_request'
     
     steps:
@@ -115,7 +152,7 @@ jobs:
   plano:
     name: Gerar Plano de Mudanças
     runs-on: ubuntu-latest
-    needs: validar
+    needs: [test, validar]
     if: github.event_name == 'pull_request'
     
     steps:
@@ -168,7 +205,7 @@ jobs:
   plano-main:
     name: Gerar Plano de Mudanças (Main)
     runs-on: ubuntu-latest
-    needs: [validar, build]
+    needs: [test, validar, build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
@@ -222,7 +259,7 @@ jobs:
   deploy:
     name: Aplicar Mudanças na Infraestrutura
     runs-on: ubuntu-latest
-    needs: [validar, build, plano-main]
+    needs: [test, validar, build, plano-main]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
