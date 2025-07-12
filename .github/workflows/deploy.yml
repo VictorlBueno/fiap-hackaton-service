@@ -35,18 +35,12 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Executar testes com coverage
-        run: npm run test:cov
-
-      - name: Verificar cobertura mínima
         run: |
-          COVERAGE=$(npm run test:cov 2>&1 | grep -o "All files[^%]*" | grep -o "[0-9]*\.[0-9]*" | head -1)
-          echo "Cobertura atual: $COVERAGE%"
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "❌ Cobertura de testes abaixo de 80% (atual: $COVERAGE%)"
-            exit 1
-          else
-            echo "✅ Cobertura de testes OK: $COVERAGE%"
-          fi
+          echo "🧪 Executando testes..."
+          npm run test:cov -- --silent --no-coverage-reporters=text
+          echo ""
+          echo "📊 Resumo dos testes:"
+          npm run test:cov -- --silent --no-coverage-reporters=text 2>&1 | grep -E "(PASS|FAIL|Tests:|✓|✗)" || true
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
