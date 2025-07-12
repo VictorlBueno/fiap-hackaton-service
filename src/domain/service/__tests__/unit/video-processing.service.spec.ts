@@ -44,6 +44,7 @@ describe('VideoProcessingService', () => {
       getSignedDownloadUrl: jest.fn(),
       deleteFile: jest.fn(),
       fileExists: jest.fn(),
+      downloadFile: jest.fn(),
     };
 
     mockJobRepository = {
@@ -96,6 +97,7 @@ describe('VideoProcessingService', () => {
 
       beforeEach(() => {
         mockFileStorage.fileExists.mockResolvedValue(true);
+        mockFileStorage.downloadFile.mockResolvedValue();
         mockVideoProcessor.extractFrames.mockResolvedValue(mockFrameFiles);
         mockFileStorage.uploadFile.mockResolvedValue('s3-key');
         mockFileStorage.createZip.mockResolvedValue();
@@ -109,12 +111,12 @@ describe('VideoProcessingService', () => {
 
         expect(result).toEqual(mockCompletedJob);
         expect(mockVideoProcessor.extractFrames).toHaveBeenCalledWith(
-          mockVideo.path,
-          expect.stringContaining('temp/job-123')
+          expect.stringContaining('/tmp/job-123_test-video.mp4'),
+          expect.stringContaining('/tmp/frames_job-123')
         );
         expect(mockFileStorage.createZip).toHaveBeenCalledWith(
           mockFrameFiles,
-          expect.stringContaining('outputs/job-123.zip')
+          expect.stringContaining('/tmp/job-123.zip')
         );
       });
 
@@ -133,6 +135,7 @@ describe('VideoProcessingService', () => {
 
       beforeEach(() => {
         mockFileStorage.fileExists.mockResolvedValue(true);
+        mockFileStorage.downloadFile.mockResolvedValue();
         mockVideoProcessor.extractFrames.mockRejectedValue(extractionError);
         mockJobRepository.updateJobStatus.mockResolvedValue();
         mockJobRepository.findJobById.mockResolvedValue(mockCompletedJob);
@@ -152,6 +155,7 @@ describe('VideoProcessingService', () => {
     describe('When no frames are extracted', () => {
       beforeEach(() => {
         mockFileStorage.fileExists.mockResolvedValue(true);
+        mockFileStorage.downloadFile.mockResolvedValue();
         mockVideoProcessor.extractFrames.mockResolvedValue([]);
         mockJobRepository.updateJobStatus.mockResolvedValue();
         mockJobRepository.findJobById.mockResolvedValue(mockCompletedJob);

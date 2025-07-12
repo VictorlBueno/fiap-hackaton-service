@@ -32,7 +32,10 @@ jest.mock('fs', () => ({
 
 // Mock manual para archiver
 let mockArchive;
-jest.mock('archiver', () => () => mockArchive);
+jest.mock('archiver', () => () => ({
+  ...mockArchive,
+  pointer: jest.fn().mockReturnValue(1024),
+}));
 
 describe('S3StorageAdapter', () => {
   let adapter: any;
@@ -53,6 +56,14 @@ describe('S3StorageAdapter', () => {
     s3ClientModule.S3Client.mockImplementation(() => mockS3Client);
     mockFs = fs;
     mockGetSignedUrl = getSignedUrl;
+
+    mockArchive = {
+      pipe: jest.fn().mockReturnThis(),
+      append: jest.fn().mockReturnThis(),
+      finalize: jest.fn().mockReturnThis(),
+      on: jest.fn().mockReturnThis(),
+      pointer: jest.fn().mockReturnValue(1024),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [S3StorageAdapter],
@@ -136,7 +147,7 @@ describe('S3StorageAdapter', () => {
       });
       it('Then should throw region error', async () => {
         await expect(adapter.uploadFile('/local/path/video.mp4', 'uploads/video.mp4')).rejects.toThrow(
-          'Erro de região S3: O bucket \'fiap-hackaton-v\' não está na região \'us-east-1\'. Verifique a configuração AWS_REGION.'
+          'Erro de região S3: O bucket \'test-bucket\' não está na região \'us-east-1\'. Verifique a configuração AWS_REGION.'
         );
       });
     });

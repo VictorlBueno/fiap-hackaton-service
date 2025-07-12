@@ -8,6 +8,7 @@ import { FileStoragePort } from '../../../../../domain/ports/gateways/file-stora
 import { AuthenticatedRequest } from '../../../../middleware/jwt-auth.middleware';
 import { ProcessingJob } from '../../../../../domain/entities/processing-job.entity';
 import { Readable } from 'stream';
+import { MetricsService } from '../../../services/metrics.service';
 
 describe('VideoController - Unit Tests', () => {
   let controller: VideoController;
@@ -98,7 +99,7 @@ describe('VideoController - Unit Tests', () => {
           useValue: mockFileStorage,
         },
         {
-          provide: 'MetricsService',
+          provide: MetricsService,
           useValue: mockMetricsService,
         },
       ],
@@ -160,7 +161,19 @@ describe('VideoController - Unit Tests', () => {
         it('Then should return job data', async () => {
           const result = await controller.getJobStatus('job-123', mockAuthenticatedRequest);
 
-          expect(result).toEqual(mockJob);
+          expect(result).toEqual({
+            id: mockJob.id,
+            videoName: mockJob.videoName,
+            status: mockJob.status,
+            message: mockJob.message,
+            frameCount: mockJob.frameCount,
+            zipFilename: mockJob.zipPath,
+            downloadUrl: mockJob.status === 'completed' && mockJob.zipPath ? `/download/${mockJob.zipPath}` : null,
+            createdAt: mockJob.createdAt.toISOString(),
+            updatedAt: mockJob.updatedAt ? mockJob.updatedAt.toISOString() : mockJob.createdAt.toISOString(),
+            duration: expect.any(String),
+            canDownload: mockJob.status === 'completed' && !!mockJob.zipPath,
+          });
           expect(mockGetJobStatusUseCase.execute).toHaveBeenCalledWith('job-123', 'user-123');
         });
       });

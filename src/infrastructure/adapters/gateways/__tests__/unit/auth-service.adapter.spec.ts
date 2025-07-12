@@ -42,7 +42,7 @@ describe('AuthServiceAdapter', () => {
 
         expect(result).toBe(mockUserEmail);
         expect(mockAxios.get).toHaveBeenCalledWith(
-          `${process.env.AUTH_SERVICE_URL || 'http://localhost:3234'}/api/v1/users/${mockUserId}/email`,
+          `${process.env.AUTH_SERVICE_URL || 'http://localhost:3234'}/v1/users/${mockUserId}/email`,
           {
             timeout: 5000,
           }
@@ -55,7 +55,7 @@ describe('AuthServiceAdapter', () => {
         await adapter.getUserEmail(mockUserId);
 
         expect(mockAxios.get).toHaveBeenCalledWith(
-          'http://localhost:3234/api/v1/users/user-123/email',
+          'http://localhost:3234/v1/users/user-123/email',
           {
             timeout: 5000,
           }

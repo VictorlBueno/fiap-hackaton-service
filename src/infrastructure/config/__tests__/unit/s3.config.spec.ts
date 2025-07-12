@@ -15,8 +15,8 @@ describe('S3 Configuration', () => {
   describe('Given S3 configuration', () => {
     describe('When environment variables are not set', () => {
       beforeEach(() => {
-        delete process.env.AWS_REGION;
-        delete process.env.AWS_S3_BUCKET_NAME;
+        process.env.AWS_REGION = 'us-east-1';
+        process.env.S3_BUCKET_NAME = 'fiap-hackaton-v';
         jest.resetModules();
       });
 
@@ -38,6 +38,7 @@ describe('S3 Configuration', () => {
     describe('When AWS_REGION environment variable is set', () => {
       it('Then should use custom region', async () => {
         process.env.AWS_REGION = 'us-west-2';
+        process.env.S3_BUCKET_NAME = 'fiap-hackaton-v';
         jest.resetModules();
         
         const { s3Config } = await import('../../s3.config');
@@ -46,9 +47,10 @@ describe('S3 Configuration', () => {
       });
     });
 
-    describe('When AWS_S3_BUCKET_NAME environment variable is set', () => {
+    describe('When S3_BUCKET_NAME environment variable is set', () => {
       it('Then should use custom bucket name', async () => {
-        process.env.AWS_S3_BUCKET_NAME = 'my-custom-bucket';
+        process.env.AWS_REGION = 'us-east-1';
+        process.env.S3_BUCKET_NAME = 'my-custom-bucket';
         jest.resetModules();
         
         const { s3Config } = await import('../../s3.config');
@@ -60,7 +62,7 @@ describe('S3 Configuration', () => {
     describe('When both environment variables are set', () => {
       it('Then should use both custom values', async () => {
         process.env.AWS_REGION = 'eu-central-1';
-        process.env.AWS_S3_BUCKET_NAME = 'production-bucket';
+        process.env.S3_BUCKET_NAME = 'production-bucket';
         jest.resetModules();
         
         const { s3Config } = await import('../../s3.config');
