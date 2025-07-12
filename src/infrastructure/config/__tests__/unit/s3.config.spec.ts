@@ -1,15 +1,9 @@
 import { s3Config, S3Config } from '../../s3.config';
 
 describe('S3 Configuration', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    jest.resetModules();
-    process.env = { ...originalEnv };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
+    process.env.AWS_REGION = 'us-east-1';
+    process.env.S3_BUCKET_NAME = 'test-bucket';
   });
 
   describe('Given S3 configuration', () => {

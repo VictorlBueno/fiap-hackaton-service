@@ -8,11 +8,11 @@ const mockPool = Pool as jest.MockedClass<typeof Pool>;
 describe('Configuração do Banco de Dados', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    delete process.env.DB_HOST;
-    delete process.env.DB_PORT;
-    delete process.env.DB_USERNAME;
-    delete process.env.DB_PASSWORD;
-    delete process.env.DB_NAME;
+    process.env.DB_HOST = 'localhost';
+    process.env.DB_PORT = '5432';
+    process.env.DB_USERNAME = 'postgres';
+    process.env.DB_PASSWORD = 'postgres123';
+    process.env.DB_NAME = 'video_processor';
   });
 
   describe('Dada a configuração do banco de dados', () => {

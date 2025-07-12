@@ -7,20 +7,16 @@ const mockAxios = axios as jest.Mocked<typeof axios>;
 
 describe('Adaptador de Serviço de Autenticação', () => {
   let adapter: AuthServiceAdapter;
-  const originalEnv = process.env;
 
   beforeEach(async () => {
+    process.env.AUTH_SERVICE_URL = 'http://localhost:3234';
+    
     const module: TestingModule = await Test.createTestingModule({
       providers: [AuthServiceAdapter],
     }).compile();
 
     adapter = module.get<AuthServiceAdapter>(AuthServiceAdapter);
     jest.clearAllMocks();
-    process.env = { ...originalEnv };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   describe('Dado o AuthServiceAdapter', () => {
