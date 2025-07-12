@@ -5,26 +5,22 @@ import { AuthServiceAdapter } from '../../auth-service.adapter';
 jest.mock('axios');
 const mockAxios = axios as jest.Mocked<typeof axios>;
 
-describe('AuthServiceAdapter', () => {
+describe('Adaptador de Serviço de Autenticação', () => {
   let adapter: AuthServiceAdapter;
-  const originalEnv = process.env;
 
   beforeEach(async () => {
+    process.env.AUTH_SERVICE_URL = 'http://localhost:3234';
+    
     const module: TestingModule = await Test.createTestingModule({
       providers: [AuthServiceAdapter],
     }).compile();
 
     adapter = module.get<AuthServiceAdapter>(AuthServiceAdapter);
     jest.clearAllMocks();
-    process.env = { ...originalEnv };
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  describe('Given AuthServiceAdapter', () => {
-    describe('When getting user email successfully', () => {
+  describe('Dado o AuthServiceAdapter', () => {
+    describe('Quando obtendo email do usuário com sucesso', () => {
       const mockUserId = 'user-123';
       const mockUserEmail = 'test@example.com';
 
@@ -37,25 +33,25 @@ describe('AuthServiceAdapter', () => {
         });
       });
 
-      it('Then should return user email', async () => {
+      it('Então deve retornar o email do usuário', async () => {
         const result = await adapter.getUserEmail(mockUserId);
 
         expect(result).toBe(mockUserEmail);
         expect(mockAxios.get).toHaveBeenCalledWith(
-          `${process.env.AUTH_SERVICE_URL || 'http://localhost:3234'}/api/v1/users/${mockUserId}/email`,
+          `${process.env.AUTH_SERVICE_URL || 'http://localhost:3234'}/v1/users/${mockUserId}/email`,
           {
             timeout: 5000,
           }
         );
       });
 
-      it('Then should use default auth service URL when not configured', async () => {
+      it('Então deve usar URL padrão do serviço de auth quando não configurado', async () => {
         delete process.env.AUTH_SERVICE_URL;
 
         await adapter.getUserEmail(mockUserId);
 
         expect(mockAxios.get).toHaveBeenCalledWith(
-          'http://localhost:3234/api/v1/users/user-123/email',
+          'http://localhost:3234/v1/users/user-123/email',
           {
             timeout: 5000,
           }
@@ -63,7 +59,7 @@ describe('AuthServiceAdapter', () => {
       });
     });
 
-    describe('When auth service returns success false', () => {
+    describe('Quando o serviço de auth retorna success false', () => {
       const mockUserId = 'user-456';
 
       beforeEach(() => {
@@ -75,7 +71,7 @@ describe('AuthServiceAdapter', () => {
         });
       });
 
-      it('Then should return null', async () => {
+      it('Então deve retornar null', async () => {
         const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
         const result = await adapter.getUserEmail(mockUserId);
@@ -90,7 +86,7 @@ describe('AuthServiceAdapter', () => {
       });
     });
 
-    describe('When auth service request fails', () => {
+    describe('Quando a requisição para o serviço de auth falha', () => {
       const mockUserId = 'user-999';
       const networkError = new Error('Network timeout');
 
@@ -98,7 +94,7 @@ describe('AuthServiceAdapter', () => {
         mockAxios.get.mockRejectedValue(networkError);
       });
 
-      it('Then should return null and log error', async () => {
+      it('Então deve retornar null e logar erro', async () => {
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
         const result = await adapter.getUserEmail(mockUserId);
@@ -112,7 +108,7 @@ describe('AuthServiceAdapter', () => {
         consoleSpy.mockRestore();
       });
 
-      it('Then should not throw exception', async () => {
+      it('Então não deve lançar exceção', async () => {
         await expect(adapter.getUserEmail(mockUserId)).resolves.toBeNull();
       });
     });

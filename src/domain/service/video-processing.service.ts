@@ -17,7 +17,7 @@ export class VideoProcessingService {
     @Inject('JobRepositoryPort')
     private readonly jobRepository: JobRepositoryPort,
     private readonly emailNotificationService: EmailNotificationService,
-    private readonly metricsService: MetricsService,
+    @Inject('MetricsService') private readonly metricsService: MetricsService,
   ) {}
 
   async processVideo(video: Video, userSub: string): Promise<ProcessingJob | null> {

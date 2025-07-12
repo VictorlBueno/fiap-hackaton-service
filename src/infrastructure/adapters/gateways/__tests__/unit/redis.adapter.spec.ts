@@ -17,7 +17,7 @@ jest.mock('ioredis', () => {
   };
 });
 
-describe('RedisJobRepositoryAdapter', () => {
+describe('Adaptador de Repositório Redis', () => {
   let adapter: RedisJobRepositoryAdapter;
   let redisMock: any;
 
@@ -29,8 +29,8 @@ describe('RedisJobRepositoryAdapter', () => {
     redisMock = (adapter as any).redis;
   });
 
-  describe('When saving a pending job', () => {
-    it('should store the job in Redis', async () => {
+  describe('Quando salvando um job pendente', () => {
+    it('deve armazenar o job no Redis', async () => {
       const job = ProcessingJob.createPending('id1', 'video.mp4', 'user1');
       await adapter.saveJob(job);
       expect(redisMock.set).toHaveBeenCalled();
@@ -38,36 +38,36 @@ describe('RedisJobRepositoryAdapter', () => {
     });
   });
 
-  describe('When finding a job by id', () => {
-    it('should return the job if it exists', async () => {
+  describe('Quando encontrando um job por id', () => {
+    it('deve retornar o job se ele existir', async () => {
       const job = ProcessingJob.createPending('id2', 'video2.mp4', 'user2');
       redisMock.get.mockResolvedValueOnce(JSON.stringify(job));
       const result = await adapter.findJobById('id2', 'user2');
       expect(result).toBeInstanceOf(ProcessingJob);
       expect(result?.id).toBe('id2');
     });
-    it('should return null if job does not exist', async () => {
+    it('deve retornar null se o job não existir', async () => {
       redisMock.get.mockResolvedValueOnce(null);
       const result = await adapter.findJobById('id3', 'user3');
       expect(result).toBeNull();
     });
   });
 
-  describe('When updating job status', () => {
-    it('should update the job in Redis', async () => {
+  describe('Quando atualizando status do job', () => {
+    it('deve atualizar o job no Redis', async () => {
       const job = ProcessingJob.createPending('id6', 'video6.mp4', 'user6');
       redisMock.get.mockResolvedValueOnce(JSON.stringify(job));
       await adapter.updateJobStatus('id6', JobStatus.PROCESSING, 'Processing...', { userId: 'user6' });
       expect(redisMock.set).toHaveBeenCalled();
     });
-    it('should do nothing if job does not exist', async () => {
+    it('deve não fazer nada se o job não existir', async () => {
       redisMock.get.mockResolvedValueOnce(null);
       await expect(adapter.updateJobStatus('id7', JobStatus.PROCESSING, 'Processing...', { userId: 'user7' })).resolves.toBeUndefined();
     });
   });
 
-  describe('When removing a job', () => {
-    it('should remove the job from Redis', async () => {
+  describe('Quando removendo um job', () => {
+    it('deve remover o job do Redis', async () => {
       await adapter.removeJob('id8', 'user8');
       expect(redisMock.del).toHaveBeenCalled();
       expect(redisMock.srem).toHaveBeenCalled();

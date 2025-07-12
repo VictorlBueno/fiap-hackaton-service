@@ -337,3 +337,38 @@ kubectl rollout undo deployment/video-processor -n video-processor
 cd terraform && terraform plan
 cd terraform && terraform apply
 ```
+
+## 🗂️ Arquitetura de Pastas e Justificativa da Arquitetura Hexagonal
+
+### Estrutura de Pastas
+
+A estrutura do projeto segue o padrão da arquitetura hexagonal (Ports & Adapters), separando claramente as responsabilidades em camadas:
+
+```
+src/
+  application/         # Casos de uso e portas de entrada (Application Service)
+    ports/             # Interfaces (ports) para controladores e gateways
+    usecases/          # Implementação dos casos de uso do domínio
+  domain/              # Entidades e regras de negócio puras
+    entities/          # Entidades do domínio
+    ports/             # Interfaces para gateways e repositórios
+    service/           # Serviços de domínio (lógica de negócio)
+  infrastructure/      # Adapters e implementação de interfaces externas
+    adapters/          # Controllers, gateways, repositórios, serviços externos
+    config/            # Configurações de infraestrutura (DB, S3, etc)
+    http/              # Inicialização HTTP (main.ts)
+    middleware/        # Middlewares globais
+    modules/           # Módulos do NestJS
+  test/                # Mocks e setup de testes
+```
+
+### Por que Arquitetura Hexagonal?
+
+A arquitetura hexagonal foi escolhida para este projeto porque:
+
+- **Isolamento de Domínio:** Permite que a lógica de negócio (domínio) fique totalmente isolada de frameworks, bancos de dados e detalhes de infraestrutura.
+- **Facilidade de Testes:** Com as dependências externas desacopladas por meio de interfaces (ports), é fácil mockar/adaptar qualquer integração, facilitando testes unitários e de integração.
+- **Flexibilidade e Evolução:** Novos tipos de entrada (ex: REST, fila, eventos) ou saída (ex: diferentes bancos, serviços externos) podem ser adicionados sem impactar o núcleo do domínio.
+- **Manutenção e Escalabilidade:** O código fica mais organizado, modular e de fácil manutenção, permitindo evolução incremental e segura.
+
+Essa abordagem garante um sistema robusto, testável e preparado para mudanças, alinhado com as melhores práticas de arquitetura de software.

@@ -3,7 +3,7 @@ import {ListAllJobsUseCase} from "../../list-all-job-usecase";
 import {JobRepositoryPort} from "../../../../domain/ports/repositories/job-repository.port";
 import {JobStatus, ProcessingJob} from "../../../../domain/entities/processing-job.entity";
 
-describe('ListAllJobsUseCase - Unit Tests', () => {
+describe('Caso de Uso de Listagem de Todos os Jobs - Testes Unitários', () => {
   let useCase: ListAllJobsUseCase;
   let jobRepository: jest.Mocked<JobRepositoryPort>;
 
@@ -37,13 +37,13 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
     jobRepository = module.get('JobRepositoryPort');
   });
 
-  describe('Given ListAllJobsUseCase', () => {
-    describe('When executing with valid userId', () => {
+  describe('Dado o ListAllJobsUseCase', () => {
+    describe('Quando executando com userId válido', () => {
       beforeEach(() => {
         jobRepository.getAllJobsByUser.mockResolvedValue(mockJobs);
       });
 
-      it('Then should return all jobs for the user', async () => {
+      it('Então deve retornar todos os jobs do usuário', async () => {
         const result = await useCase.execute('user-123');
 
         expect(result).toBe(mockJobs);
@@ -52,7 +52,7 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
         expect(jobRepository.getAllJobsByUser).toHaveBeenCalledTimes(1);
       });
 
-      it('Then should return jobs with different statuses', async () => {
+      it('Então deve retornar jobs com diferentes status', async () => {
         const result = await useCase.execute('user-123');
 
         expect(result[0].status).toBe(JobStatus.COMPLETED);
@@ -61,12 +61,12 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When user has no jobs', () => {
+    describe('Quando o usuário não tem jobs', () => {
       beforeEach(() => {
         jobRepository.getAllJobsByUser.mockResolvedValue([]);
       });
 
-      it('Then should return empty array', async () => {
+      it('Então deve retornar array vazio', async () => {
         const result = await useCase.execute('user-without-jobs');
 
         expect(result).toEqual([]);
@@ -75,14 +75,14 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When user has single job', () => {
+    describe('Quando o usuário tem um único job', () => {
       const singleJob = [ProcessingJob.createProcessing('job-single', 'single.mp4', 'user-single')];
 
       beforeEach(() => {
         jobRepository.getAllJobsByUser.mockResolvedValue(singleJob);
       });
 
-      it('Then should return array with one job', async () => {
+      it('Então deve retornar array com um job', async () => {
         const result = await useCase.execute('user-single');
 
         expect(result).toBe(singleJob);
@@ -91,26 +91,26 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When repository throws error', () => {
+    describe('Quando o repositório lança erro', () => {
       const repositoryError = new Error('Database connection timeout');
 
       beforeEach(() => {
         jobRepository.getAllJobsByUser.mockRejectedValue(repositoryError);
       });
 
-      it('Then should propagate the error', async () => {
+      it('Então deve propagar o erro', async () => {
         await expect(useCase.execute('user-123')).rejects.toThrow('Database connection timeout');
 
         expect(jobRepository.getAllJobsByUser).toHaveBeenCalledWith('user-123');
       });
     });
 
-    describe('When called with empty userId', () => {
+    describe('Quando chamado com userId vazio', () => {
       beforeEach(() => {
         jobRepository.getAllJobsByUser.mockResolvedValue([]);
       });
 
-      it('Then should pass empty string to repository', async () => {
+      it('Então deve passar string vazia para o repositório', async () => {
         const result = await useCase.execute('');
 
         expect(result).toEqual([]);
@@ -118,12 +118,12 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When called multiple times with same userId', () => {
+    describe('Quando chamado múltiplas vezes com o mesmo userId', () => {
       beforeEach(() => {
         jobRepository.getAllJobsByUser.mockResolvedValue(mockJobs);
       });
 
-      it('Then should call repository each time', async () => {
+      it('Então deve chamar o repositório cada vez', async () => {
         await useCase.execute('user-123');
         await useCase.execute('user-123');
 
@@ -133,14 +133,14 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When called with different userIds', () => {
+    describe('Quando chamado com diferentes userIds', () => {
       beforeEach(() => {
         jobRepository.getAllJobsByUser
             .mockResolvedValueOnce([mockJobs[0]])
             .mockResolvedValueOnce([mockJobs[1], mockJobs[2]]);
       });
 
-      it('Then should return different results for different users', async () => {
+      it('Então deve retornar resultados diferentes para usuários diferentes', async () => {
         const result1 = await useCase.execute('user-1');
         const result2 = await useCase.execute('user-2');
 
@@ -151,7 +151,7 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When repository returns large number of jobs', () => {
+    describe('Quando o repositório retorna grande número de jobs', () => {
       const manyJobs = Array.from({ length: 100 }, (_, i) =>
           ProcessingJob.createCompleted(`job-${i}`, `video${i}.mp4`, 'user-many', 50, `frames${i}.zip`)
       );
@@ -160,7 +160,7 @@ describe('ListAllJobsUseCase - Unit Tests', () => {
         jobRepository.getAllJobsByUser.mockResolvedValue(manyJobs);
       });
 
-      it('Then should return all jobs without modification', async () => {
+      it('Então deve retornar todos os jobs sem modificação', async () => {
         const result = await useCase.execute('user-many');
 
         expect(result).toBe(manyJobs);

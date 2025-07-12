@@ -1,48 +1,48 @@
 import {ProcessedFile} from "../../processed-file.entity";
 
-describe('ProcessedFile', () => {
-    describe('Given a ProcessedFile instance', () => {
+describe('Arquivo Processado', () => {
+    describe('Dado uma instância de ProcessedFile', () => {
         const filename = 'document.pdf';
         const size = 1024;
         const createdAt = new Date('2025-01-15T10:30:00Z');
         const downloadUrl = 'https://storage.example.com/files/document.pdf';
 
-        describe('When created with valid parameters', () => {
+        describe('Quando criado com parâmetros válidos', () => {
             const processedFile = new ProcessedFile(filename, size, createdAt, downloadUrl);
 
-            it('Then should have correct filename', () => {
+            it('Então deve ter o nome do arquivo correto', () => {
                 expect(processedFile.filename).toBe(filename);
             });
 
-            it('Then should have correct size', () => {
+            it('Então deve ter o tamanho correto', () => {
                 expect(processedFile.size).toBe(size);
             });
 
-            it('Then should have correct creation date', () => {
+            it('Então deve ter a data de criação correta', () => {
                 expect(processedFile.createdAt).toBe(createdAt);
             });
 
-            it('Then should have correct download URL', () => {
+            it('Então deve ter a URL de download correta', () => {
                 expect(processedFile.downloadUrl).toBe(downloadUrl);
             });
         });
 
-        describe('When created with empty filename', () => {
-            it('Then should accept empty string', () => {
+        describe('Quando criado com nome de arquivo vazio', () => {
+            it('Então deve aceitar string vazia', () => {
                 const file = new ProcessedFile('', size, createdAt, downloadUrl);
                 expect(file.filename).toBe('');
             });
         });
 
-        describe('When created with zero size', () => {
-            it('Then should accept zero size', () => {
+        describe('Quando criado com tamanho zero', () => {
+            it('Então deve aceitar tamanho zero', () => {
                 const file = new ProcessedFile(filename, 0, createdAt, downloadUrl);
                 expect(file.size).toBe(0);
             });
         });
 
-        describe('When created with negative size', () => {
-            it('Then should accept negative size', () => {
+        describe('Quando criado com tamanho negativo', () => {
+            it('Então deve aceitar tamanho negativo', () => {
                 const file = new ProcessedFile(filename, -100, createdAt, downloadUrl);
                 expect(file.size).toBe(-100);
             });
