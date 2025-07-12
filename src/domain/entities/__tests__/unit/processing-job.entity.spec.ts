@@ -1,14 +1,14 @@
 import {JobStatus, ProcessingJob} from "../../processing-job.entity";
 
-describe('ProcessingJob', () => {
+describe('Job de Processamento', () => {
     const baseJobData = {
         id: '2025-06-28T16-43-36-099Z',
         videoName: 'video.mp4',
         userId: 'user-123',
     };
 
-    describe('Given a ProcessingJob constructor', () => {
-        describe('When creating with all parameters', () => {
+    describe('Dado um construtor de ProcessingJob', () => {
+        describe('Quando criado com todos os parâmetros', () => {
             const createdAt = new Date('2025-01-15T10:30:00Z');
             const updatedAt = new Date('2025-01-15T11:30:00Z');
 
@@ -24,7 +24,7 @@ describe('ProcessingJob', () => {
                 updatedAt,
             );
 
-            it('Then should set all properties correctly', () => {
+            it('Então deve definir todas as propriedades corretamente', () => {
                 expect(job.id).toBe(baseJobData.id);
                 expect(job.videoName).toBe(baseJobData.videoName);
                 expect(job.status).toBe(JobStatus.COMPLETED);
@@ -37,7 +37,7 @@ describe('ProcessingJob', () => {
             });
         });
 
-        describe('When creating without optional parameters', () => {
+        describe('Quando criado sem parâmetros opcionais', () => {
             const job = new ProcessingJob(
                 baseJobData.id,
                 baseJobData.videoName,
@@ -46,7 +46,7 @@ describe('ProcessingJob', () => {
                 baseJobData.userId,
             );
 
-            it('Then should set required properties and defaults', () => {
+            it('Então deve definir propriedades obrigatórias e valores padrão', () => {
                 expect(job.frameCount).toBeUndefined();
                 expect(job.zipPath).toBeUndefined();
                 expect(job.updatedAt).toBeUndefined();
@@ -54,8 +54,8 @@ describe('ProcessingJob', () => {
             });
         });
 
-        describe('When creating without createdAt', () => {
-            it('Then should use current date as default', () => {
+        describe('Quando criado sem createdAt', () => {
+            it('Então deve usar a data atual como padrão', () => {
                 const beforeCreation = new Date();
                 const job = new ProcessingJob(
                     baseJobData.id,
@@ -72,15 +72,15 @@ describe('ProcessingJob', () => {
         });
     });
 
-    describe('Given ProcessingJob factory methods', () => {
-        describe('When creating a pending job', () => {
+    describe('Dados os métodos factory de ProcessingJob', () => {
+        describe('Quando criando um job pendente', () => {
             const job = ProcessingJob.createPending(
                 baseJobData.id,
                 baseJobData.videoName,
                 baseJobData.userId,
             );
 
-            it('Then should have pending status and correct message', () => {
+            it('Então deve ter status pendente e mensagem correta', () => {
                 expect(job.status).toBe(JobStatus.PENDING);
                 expect(job.message).toBe('Vídeo adicionado à fila de processamento');
                 expect(job.frameCount).toBeUndefined();
@@ -88,14 +88,14 @@ describe('ProcessingJob', () => {
             });
         });
 
-        describe('When creating a processing job', () => {
+        describe('Quando criando um job em processamento', () => {
             const job = ProcessingJob.createProcessing(
                 baseJobData.id,
                 baseJobData.videoName,
                 baseJobData.userId,
             );
 
-            it('Then should have processing status and correct message', () => {
+            it('Então deve ter status de processamento e mensagem correta', () => {
                 expect(job.status).toBe(JobStatus.PROCESSING);
                 expect(job.message).toBe('Processando vídeo e extraindo frames...');
                 expect(job.frameCount).toBeUndefined();
@@ -103,7 +103,7 @@ describe('ProcessingJob', () => {
             });
         });
 
-        describe('When creating a completed job', () => {
+        describe('Quando criando um job concluído', () => {
             const frameCount = 150;
             const zipPath = 'frames.zip';
 
@@ -115,7 +115,7 @@ describe('ProcessingJob', () => {
                 zipPath,
             );
 
-            it('Then should have completed status with frame data', () => {
+            it('Então deve ter status concluído com dados dos frames', () => {
                 expect(job.status).toBe(JobStatus.COMPLETED);
                 expect(job.message).toBe(`Processamento concluído! ${frameCount} frames extraídos.`);
                 expect(job.frameCount).toBe(frameCount);
@@ -123,7 +123,7 @@ describe('ProcessingJob', () => {
             });
         });
 
-        describe('When creating a failed job', () => {
+        describe('Quando criando um job falhado', () => {
             const errorMessage = 'Arquivo corrompido';
 
             const job = ProcessingJob.createFailed(
@@ -133,7 +133,7 @@ describe('ProcessingJob', () => {
                 errorMessage,
             );
 
-            it('Then should have failed status with error message', () => {
+            it('Então deve ter status falhado com mensagem de erro', () => {
                 expect(job.status).toBe(JobStatus.FAILED);
                 expect(job.message).toBe(`Falha no processamento: ${errorMessage}`);
                 expect(job.frameCount).toBeUndefined();
@@ -142,8 +142,8 @@ describe('ProcessingJob', () => {
         });
     });
 
-    describe('Given ProcessingJob status methods', () => {
-        describe('When job is completed', () => {
+    describe('Dados os métodos de status de ProcessingJob', () => {
+        describe('Quando o job está concluído', () => {
             const job = ProcessingJob.createCompleted(
                 baseJobData.id,
                 baseJobData.videoName,
@@ -152,16 +152,16 @@ describe('ProcessingJob', () => {
                 'test.zip',
             );
 
-            it('Then isCompleted should return true', () => {
+            it('Então isCompleted deve retornar true', () => {
                 expect(job.isCompleted()).toBe(true);
             });
 
-            it('Then isFailed should return false', () => {
+            it('Então isFailed deve retornar false', () => {
                 expect(job.isFailed()).toBe(false);
             });
         });
 
-        describe('When job is failed', () => {
+        describe('Quando o job falhou', () => {
             const job = ProcessingJob.createFailed(
                 baseJobData.id,
                 baseJobData.videoName,
@@ -169,44 +169,44 @@ describe('ProcessingJob', () => {
                 'Error',
             );
 
-            it('Then isFailed should return true', () => {
+            it('Então isFailed deve retornar true', () => {
                 expect(job.isFailed()).toBe(true);
             });
 
-            it('Then isCompleted should return false', () => {
+            it('Então isCompleted deve retornar false', () => {
                 expect(job.isCompleted()).toBe(false);
             });
         });
 
-        describe('When job is pending', () => {
+        describe('Quando o job está pendente', () => {
             const job = ProcessingJob.createPending(
                 baseJobData.id,
                 baseJobData.videoName,
                 baseJobData.userId,
             );
 
-            it('Then both status methods should return false', () => {
+            it('Então ambos os métodos de status devem retornar false', () => {
                 expect(job.isCompleted()).toBe(false);
                 expect(job.isFailed()).toBe(false);
             });
         });
 
-        describe('When job is processing', () => {
+        describe('Quando o job está em processamento', () => {
             const job = ProcessingJob.createProcessing(
                 baseJobData.id,
                 baseJobData.videoName,
                 baseJobData.userId,
             );
 
-            it('Then both status methods should return false', () => {
+            it('Então ambos os métodos de status devem retornar false', () => {
                 expect(job.isCompleted()).toBe(false);
                 expect(job.isFailed()).toBe(false);
             });
         });
     });
 
-    describe('Given JobStatus enum', () => {
-        it('Then should have all expected values', () => {
+    describe('Dado o enum JobStatus', () => {
+        it('Então deve ter todos os valores esperados', () => {
             expect(JobStatus.PENDING).toBe('pending');
             expect(JobStatus.PROCESSING).toBe('processing');
             expect(JobStatus.COMPLETED).toBe('completed');

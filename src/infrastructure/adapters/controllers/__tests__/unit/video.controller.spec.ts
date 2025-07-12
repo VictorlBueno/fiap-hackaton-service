@@ -10,7 +10,7 @@ import { ProcessingJob } from '../../../../../domain/entities/processing-job.ent
 import { Readable } from 'stream';
 import { MetricsService } from '../../../services/metrics.service';
 
-describe('VideoController - Unit Tests', () => {
+describe('Controlador de Vídeo - Testes Unitários', () => {
   let controller: VideoController;
   let mockUploadVideoUseCase: jest.Mocked<UploadVideoUseCase>;
   let mockGetJobStatusUseCase: jest.Mocked<GetJobStatusUseCase>;
@@ -108,8 +108,8 @@ describe('VideoController - Unit Tests', () => {
     controller = module.get<VideoController>(VideoController);
   });
 
-  describe('Given VideoController', () => {
-    describe('When uploading video successfully', () => {
+  describe('Dado o VideoController', () => {
+    describe('Quando fazendo upload de vídeo com sucesso', () => {
       beforeEach(() => {
         mockUploadVideoUseCase.execute.mockResolvedValue({
           success: true,
@@ -118,7 +118,7 @@ describe('VideoController - Unit Tests', () => {
         });
       });
 
-      it('Then should return success response', async () => {
+      it('Então deve retornar resposta de sucesso', async () => {
         const result = await controller.uploadVideo(mockFile, mockAuthenticatedRequest);
 
         expect(result).toEqual({
@@ -134,14 +134,14 @@ describe('VideoController - Unit Tests', () => {
       });
     });
 
-    describe('When upload fails', () => {
+    describe('Quando o upload falha', () => {
       const uploadError = new Error('Upload failed');
 
       beforeEach(() => {
         mockUploadVideoUseCase.execute.mockRejectedValue(uploadError);
       });
 
-      it('Then should return error response', async () => {
+      it('Então deve retornar resposta de erro', async () => {
         const result = await controller.uploadVideo(mockFile, mockAuthenticatedRequest);
 
         expect(result).toEqual({
@@ -152,13 +152,13 @@ describe('VideoController - Unit Tests', () => {
       });
     });
 
-    describe('When getting job status', () => {
-      describe('When job exists and belongs to user', () => {
+    describe('Quando obtendo status do job', () => {
+      describe('Quando o job existe e pertence ao usuário', () => {
         beforeEach(() => {
           mockGetJobStatusUseCase.execute.mockResolvedValue(mockJob);
         });
 
-        it('Then should return job data', async () => {
+        it('Então deve retornar dados do job', async () => {
           const result = await controller.getJobStatus('job-123', mockAuthenticatedRequest);
 
           expect(result).toEqual({
@@ -178,12 +178,12 @@ describe('VideoController - Unit Tests', () => {
         });
       });
 
-      describe('When job does not exist or does not belong to user', () => {
+      describe('Quando o job não existe ou não pertence ao usuário', () => {
         beforeEach(() => {
           mockGetJobStatusUseCase.execute.mockResolvedValue(null);
         });
 
-        it('Then should return error message', async () => {
+        it('Então deve retornar mensagem de erro', async () => {
           const result = await controller.getJobStatus('job-123', mockAuthenticatedRequest);
 
           expect(result).toEqual({
@@ -194,7 +194,7 @@ describe('VideoController - Unit Tests', () => {
       });
     });
 
-    describe('When downloading file', () => {
+    describe('Quando baixando arquivo', () => {
       const mockFileStream = new Readable();
 
       beforeEach(() => {
@@ -204,8 +204,8 @@ describe('VideoController - Unit Tests', () => {
         mockFileStorage.getFileStream.mockResolvedValue(mockFileStream);
       });
 
-      describe('When job exists and is completed', () => {
-        it('Then should stream file to response', async () => {
+      describe('Quando o job existe e está concluído', () => {
+        it('Então deve fazer stream do arquivo para a resposta', async () => {
           await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
           expect(mockGetJobStatusUseCase.execute).toHaveBeenCalledWith('job-123', 'user-123');
@@ -219,12 +219,12 @@ describe('VideoController - Unit Tests', () => {
         });
       });
 
-      describe('When job does not exist', () => {
+      describe('Quando o job não existe', () => {
         beforeEach(() => {
           mockGetJobStatusUseCase.execute.mockResolvedValue(null);
         });
 
-        it('Then should return forbidden error', async () => {
+        it('Então deve retornar erro de acesso negado', async () => {
           await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
           expect(mockResponse.status).toHaveBeenCalledWith(403);
@@ -234,7 +234,7 @@ describe('VideoController - Unit Tests', () => {
         });
       });
 
-      describe('When job is not completed', () => {
+      describe('Quando o job não está concluído', () => {
         beforeEach(() => {
           const pendingJob = new ProcessingJob(
             'job-123',
@@ -250,7 +250,7 @@ describe('VideoController - Unit Tests', () => {
           mockGetJobStatusUseCase.execute.mockResolvedValue(pendingJob);
         });
 
-        it('Then should return forbidden error', async () => {
+        it('Então deve retornar erro de acesso negado', async () => {
           await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
           expect(mockResponse.status).toHaveBeenCalledWith(403);
@@ -260,14 +260,14 @@ describe('VideoController - Unit Tests', () => {
         });
       });
 
-      describe('When file storage fails', () => {
+      describe('Quando o storage de arquivo falha', () => {
         const storageError = new Error('S3 error');
 
         beforeEach(() => {
           mockFileStorage.getFileStream.mockRejectedValue(storageError);
         });
 
-        it('Then should return not found error', async () => {
+        it('Então deve retornar erro de não encontrado', async () => {
           await controller.downloadFile('job-123.zip', mockResponse, mockAuthenticatedRequest);
 
           expect(mockResponse.status).toHaveBeenCalledWith(404);
@@ -278,7 +278,7 @@ describe('VideoController - Unit Tests', () => {
       });
     });
 
-    describe('When getting status', () => {
+    describe('Quando obtendo status', () => {
       const mockJobs = [
         new ProcessingJob(
           'job-1',
@@ -304,12 +304,12 @@ describe('VideoController - Unit Tests', () => {
         ),
       ];
 
-      describe('When jobs are retrieved successfully', () => {
+      describe('Quando os jobs são recuperados com sucesso', () => {
         beforeEach(() => {
           mockListAllJobsUseCase.execute.mockResolvedValue(mockJobs);
         });
 
-        it('Then should return formatted jobs with summary', async () => {
+        it('Então deve retornar jobs formatados com resumo', async () => {
           const result = await controller.getStatus(mockAuthenticatedRequest);
 
           expect(result).toEqual({
@@ -328,14 +328,14 @@ describe('VideoController - Unit Tests', () => {
         });
       });
 
-      describe('When listing jobs fails', () => {
+      describe('Quando a listagem de jobs falha', () => {
         const listError = new Error('Database error');
 
         beforeEach(() => {
           mockListAllJobsUseCase.execute.mockRejectedValue(listError);
         });
 
-        it('Then should return error response', async () => {
+        it('Então deve retornar resposta de erro', async () => {
           const result = await controller.getStatus(mockAuthenticatedRequest);
 
           expect(result).toEqual({

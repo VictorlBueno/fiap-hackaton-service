@@ -3,7 +3,7 @@ import { JobRepositoryPort } from '../../../../domain/ports/repositories/job-rep
 import {JobStatus, ProcessingJob} from '../../../../domain/entities/processing-job.entity';
 import { GetJobStatusUseCase } from '../../get-job-status.usecase';
 
-describe('GetJobStatusUseCase - Unit Tests', () => {
+describe('Caso de Uso de Obtenção de Status do Job - Testes Unitários', () => {
   let useCase: GetJobStatusUseCase;
   let jobRepository: jest.Mocked<JobRepositoryPort>;
 
@@ -37,13 +37,13 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
     jobRepository = module.get('JobRepositoryPort');
   });
 
-  describe('Given GetJobStatusUseCase', () => {
-    describe('When executing with valid jobId and userId', () => {
+  describe('Dado o GetJobStatusUseCase', () => {
+    describe('Quando executando com jobId e userId válidos', () => {
       beforeEach(() => {
         jobRepository.findJobById.mockResolvedValue(mockJob);
       });
 
-      it('Then should return the processing job', async () => {
+      it('Então deve retornar o job de processamento', async () => {
         const result = await useCase.execute('job-123', 'user-456');
 
         expect(result).toBe(mockJob);
@@ -55,12 +55,12 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When job exists but belongs to different user', () => {
+    describe('Quando o job existe mas pertence a usuário diferente', () => {
       beforeEach(() => {
         jobRepository.findJobById.mockResolvedValue(null);
       });
 
-      it('Then should return null', async () => {
+      it('Então deve retornar null', async () => {
         const result = await useCase.execute('job-123', 'different-user');
 
         expect(result).toBeNull();
@@ -71,12 +71,12 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When job does not exist', () => {
+    describe('Quando o job não existe', () => {
       beforeEach(() => {
         jobRepository.findJobById.mockResolvedValue(null);
       });
 
-      it('Then should return null', async () => {
+      it('Então deve retornar null', async () => {
         const result = await useCase.execute('non-existent-job', 'user-456');
 
         expect(result).toBeNull();
@@ -87,14 +87,14 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When repository throws error', () => {
+    describe('Quando o repositório lança erro', () => {
       const repositoryError = new Error('Database connection failed');
 
       beforeEach(() => {
         jobRepository.findJobById.mockRejectedValue(repositoryError);
       });
 
-      it('Then should propagate the error', async () => {
+      it('Então deve propagar o erro', async () => {
         await expect(useCase.execute('job-123', 'user-456')).rejects.toThrow(
           'Database connection failed',
         );
@@ -106,12 +106,12 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When called with empty jobId', () => {
+    describe('Quando chamado com jobId vazio', () => {
       beforeEach(() => {
         jobRepository.findJobById.mockResolvedValue(null);
       });
 
-      it('Then should pass empty string to repository', async () => {
+      it('Então deve passar string vazia para o repositório', async () => {
         const result = await useCase.execute('', 'user-456');
 
         expect(result).toBeNull();
@@ -119,12 +119,12 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When called with empty userId', () => {
+    describe('Quando chamado com userId vazio', () => {
       beforeEach(() => {
         jobRepository.findJobById.mockResolvedValue(null);
       });
 
-      it('Then should pass empty string to repository', async () => {
+      it('Então deve passar string vazia para o repositório', async () => {
         const result = await useCase.execute('job-123', '');
 
         expect(result).toBeNull();
@@ -132,12 +132,12 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When called multiple times with same parameters', () => {
+    describe('Quando chamado múltiplas vezes com os mesmos parâmetros', () => {
       beforeEach(() => {
         jobRepository.findJobById.mockResolvedValue(mockJob);
       });
 
-      it('Then should call repository each time', async () => {
+      it('Então deve chamar o repositório cada vez', async () => {
         await useCase.execute('job-123', 'user-456');
         await useCase.execute('job-123', 'user-456');
 
@@ -155,8 +155,8 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
       });
     });
 
-    describe('When job has different statuses', () => {
-      it('Then should return pending job correctly', async () => {
+    describe('Quando o job tem diferentes status', () => {
+      it('Então deve retornar job pendente corretamente', async () => {
         const pendingJob = ProcessingJob.createPending(
           'job-456',
           'video2.mp4',
@@ -170,7 +170,7 @@ describe('GetJobStatusUseCase - Unit Tests', () => {
         expect(result?.status).toBe(JobStatus.PENDING);
       });
 
-      it('Then should return failed job correctly', async () => {
+      it('Então deve retornar job falhado corretamente', async () => {
         const failedJob = ProcessingJob.createFailed(
           'job-789',
           'video3.mp4',

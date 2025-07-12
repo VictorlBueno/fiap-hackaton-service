@@ -6,7 +6,7 @@ import { JobRepositoryPort } from '../../../../domain/ports/repositories/job-rep
 import { Video } from '../../../../domain/entities/video.entity';
 import { ProcessingJob, JobStatus } from '../../../../domain/entities/processing-job.entity';
 
-describe('UploadVideoUseCase', () => {
+describe('Caso de Uso de Upload de Vídeo', () => {
   let useCase: UploadVideoUseCase;
   let mockFileStorage: jest.Mocked<FileStoragePort>;
   let mockQueue: jest.Mocked<QueuePort>;
@@ -88,15 +88,15 @@ describe('UploadVideoUseCase', () => {
     useCase = module.get<UploadVideoUseCase>(UploadVideoUseCase);
   });
 
-  describe('Given UploadVideoUseCase', () => {
-    describe('When uploading a valid video successfully', () => {
+  describe('Dado o UploadVideoUseCase', () => {
+    describe('Quando fazendo upload de um vídeo válido com sucesso', () => {
       beforeEach(() => {
         mockFileStorage.uploadFile.mockResolvedValue('mock-upload-path');
         mockJobRepository.saveJob.mockResolvedValue(undefined);
         mockQueue.sendMessage.mockResolvedValue(true);
       });
 
-      it('Then should upload video and create processing job', async () => {
+      it('Então deve fazer upload do vídeo e criar job de processamento', async () => {
         const result = await useCase.execute(mockFile, mockUserId, mockUserEmail);
 
         expect(result).toEqual({
@@ -126,7 +126,7 @@ describe('UploadVideoUseCase', () => {
         });
       });
 
-      it('Then should handle different video formats', async () => {
+      it('Então deve lidar com diferentes formatos de vídeo', async () => {
         const aviFile = {
           ...mockFile,
           originalname: 'test-video.avi',
@@ -143,7 +143,7 @@ describe('UploadVideoUseCase', () => {
         );
       });
 
-      it('Then should handle MOV format', async () => {
+      it('Então deve lidar com formato MOV', async () => {
         const movFile = {
           ...mockFile,
           originalname: 'test-video.mov',
@@ -161,8 +161,8 @@ describe('UploadVideoUseCase', () => {
       });
     });
 
-    describe('When no file is provided', () => {
-      it('Then should return error response', async () => {
+    describe('Quando nenhum arquivo é fornecido', () => {
+      it('Então deve retornar resposta de erro', async () => {
         const result = await useCase.execute(null as any, mockUserId, mockUserEmail);
 
         expect(result).toEqual({
@@ -175,7 +175,7 @@ describe('UploadVideoUseCase', () => {
       });
     });
 
-    describe('When video format is not supported', () => {
+    describe('Quando o formato de vídeo não é suportado', () => {
       const unsupportedFile = {
         ...mockFile,
         originalname: 'test-video.txt',
@@ -186,7 +186,7 @@ describe('UploadVideoUseCase', () => {
         mockFileStorage.deleteFile.mockResolvedValue(undefined);
       });
 
-      it('Then should delete file and return error response', async () => {
+      it('Então deve deletar arquivo e retornar resposta de erro', async () => {
         const result = await useCase.execute(unsupportedFile, mockUserId, mockUserEmail);
 
         expect(result).toEqual({
@@ -199,14 +199,14 @@ describe('UploadVideoUseCase', () => {
       });
     });
 
-    describe('When queue message sending fails', () => {
+    describe('Quando o envio de mensagem para fila falha', () => {
       beforeEach(() => {
         mockFileStorage.uploadFile.mockResolvedValue('mock-upload-path');
         mockJobRepository.saveJob.mockResolvedValue(undefined);
         mockQueue.sendMessage.mockResolvedValue(false);
       });
 
-      it('Then should return error response', async () => {
+      it('Então deve retornar resposta de erro', async () => {
         const result = await useCase.execute(mockFile, mockUserId, mockUserEmail);
 
         expect(result).toEqual({
@@ -216,53 +216,53 @@ describe('UploadVideoUseCase', () => {
       });
     });
 
-    describe('When file storage upload fails', () => {
+    describe('Quando o upload para storage falha', () => {
       beforeEach(() => {
         mockFileStorage.uploadFile.mockRejectedValue(new Error('S3 upload failed'));
       });
 
-      it('Then should propagate the error', async () => {
+      it('Então deve propagar o erro', async () => {
         await expect(useCase.execute(mockFile, mockUserId, mockUserEmail)).rejects.toThrow(
           'S3 upload failed',
         );
       });
     });
 
-    describe('When job repository save fails', () => {
+    describe('Quando o salvamento no repositório de job falha', () => {
       beforeEach(() => {
         mockFileStorage.uploadFile.mockResolvedValue('mock-upload-path');
         mockJobRepository.saveJob.mockRejectedValue(new Error('Database error'));
       });
 
-      it('Then should propagate the error', async () => {
+      it('Então deve propagar o erro', async () => {
         await expect(useCase.execute(mockFile, mockUserId, mockUserEmail)).rejects.toThrow(
           'Database error',
         );
       });
     });
 
-    describe('When queue send message throws error', () => {
+    describe('Quando o envio de mensagem para fila lança erro', () => {
       beforeEach(() => {
         mockFileStorage.uploadFile.mockResolvedValue('mock-upload-path');
         mockJobRepository.saveJob.mockResolvedValue(undefined);
         mockQueue.sendMessage.mockRejectedValue(new Error('Queue connection failed'));
       });
 
-      it('Then should propagate the error', async () => {
+      it('Então deve propagar o erro', async () => {
         await expect(useCase.execute(mockFile, mockUserId, mockUserEmail)).rejects.toThrow(
           'Queue connection failed',
         );
       });
     });
 
-    describe('When handling edge cases', () => {
+    describe('Quando lidando com casos extremos', () => {
       beforeEach(() => {
         mockFileStorage.uploadFile.mockResolvedValue('mock-upload-path');
         mockJobRepository.saveJob.mockResolvedValue(undefined);
         mockQueue.sendMessage.mockResolvedValue(true);
       });
 
-      it('Then should handle empty user email', async () => {
+      it('Então deve lidar com email de usuário vazio', async () => {
         const result = await useCase.execute(mockFile, mockUserId, undefined);
 
         expect(result.success).toBe(true);
@@ -273,7 +273,7 @@ describe('UploadVideoUseCase', () => {
         );
       });
 
-      it('Then should handle zero file size', async () => {
+      it('Então deve lidar com tamanho de arquivo zero', async () => {
         const zeroSizeFile = {
           ...mockFile,
           size: 0,
@@ -284,7 +284,7 @@ describe('UploadVideoUseCase', () => {
         expect(result.success).toBe(true);
       });
 
-      it('Then should handle large file size', async () => {
+      it('Então deve lidar com tamanho de arquivo grande', async () => {
         const largeFile = {
           ...mockFile,
           size: 100 * 1024 * 1024, // 100MB
@@ -296,56 +296,56 @@ describe('UploadVideoUseCase', () => {
       });
     });
 
-    describe('When handling different video formats validation', () => {
+    describe('Quando lidando com validação de diferentes formatos de vídeo', () => {
       beforeEach(() => {
         mockFileStorage.uploadFile.mockResolvedValue('mock-upload-path');
         mockJobRepository.saveJob.mockResolvedValue(undefined);
         mockQueue.sendMessage.mockResolvedValue(true);
       });
 
-      it('Then should accept MP4 format', async () => {
+      it('Então deve aceitar formato MP4', async () => {
         const mp4File = { ...mockFile, originalname: 'test.mp4' } as Express.Multer.File;
         const result = await useCase.execute(mp4File, mockUserId, mockUserEmail);
         expect(result.success).toBe(true);
       });
 
-      it('Then should accept AVI format', async () => {
+      it('Então deve aceitar formato AVI', async () => {
         const aviFile = { ...mockFile, originalname: 'test.avi' } as Express.Multer.File;
         const result = await useCase.execute(aviFile, mockUserId, mockUserEmail);
         expect(result.success).toBe(true);
       });
 
-      it('Then should accept MOV format', async () => {
+      it('Então deve aceitar formato MOV', async () => {
         const movFile = { ...mockFile, originalname: 'test.mov' } as Express.Multer.File;
         const result = await useCase.execute(movFile, mockUserId, mockUserEmail);
         expect(result.success).toBe(true);
       });
 
-      it('Then should accept MKV format', async () => {
+      it('Então deve aceitar formato MKV', async () => {
         const mkvFile = { ...mockFile, originalname: 'test.mkv' } as Express.Multer.File;
         const result = await useCase.execute(mkvFile, mockUserId, mockUserEmail);
         expect(result.success).toBe(true);
       });
 
-      it('Then should accept WMV format', async () => {
+      it('Então deve aceitar formato WMV', async () => {
         const wmvFile = { ...mockFile, originalname: 'test.wmv' } as Express.Multer.File;
         const result = await useCase.execute(wmvFile, mockUserId, mockUserEmail);
         expect(result.success).toBe(true);
       });
 
-      it('Then should accept FLV format', async () => {
+      it('Então deve aceitar formato FLV', async () => {
         const flvFile = { ...mockFile, originalname: 'test.flv' } as Express.Multer.File;
         const result = await useCase.execute(flvFile, mockUserId, mockUserEmail);
         expect(result.success).toBe(true);
       });
 
-      it('Then should accept WEBM format', async () => {
+      it('Então deve aceitar formato WEBM', async () => {
         const webmFile = { ...mockFile, originalname: 'test.webm' } as Express.Multer.File;
         const result = await useCase.execute(webmFile, mockUserId, mockUserEmail);
         expect(result.success).toBe(true);
       });
 
-      it('Then should reject unsupported format', async () => {
+      it('Então deve rejeitar formato não suportado', async () => {
         const unsupportedFile = { ...mockFile, originalname: 'test.xyz' } as Express.Multer.File;
         const result = await useCase.execute(unsupportedFile, mockUserId, mockUserEmail);
         expect(result.success).toBe(false);

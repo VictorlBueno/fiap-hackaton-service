@@ -4,7 +4,7 @@ import { EmailProviderPort } from '../../../ports/gateways/email-provider.port';
 import { AuthServiceAdapter } from '../../../../infrastructure/adapters/gateways/auth-service.adapter';
 import { ProcessingJob, JobStatus } from '../../../entities/processing-job.entity';
 
-describe('EmailNotificationService', () => {
+describe('Serviço de Notificação por Email', () => {
   let service: EmailNotificationService;
   let mockEmailProvider: jest.Mocked<EmailProviderPort>;
   let mockAuthService: jest.Mocked<AuthServiceAdapter>;
@@ -53,14 +53,14 @@ describe('EmailNotificationService', () => {
     service = module.get<EmailNotificationService>(EmailNotificationService);
   });
 
-  describe('Given EmailNotificationService', () => {
-    describe('When notifying video processing complete for completed job', () => {
+  describe('Dado o EmailNotificationService', () => {
+    describe('Quando notificando processamento de vídeo concluído para job concluído', () => {
       beforeEach(() => {
         mockAuthService.getUserEmail.mockResolvedValue(mockUserEmail);
         mockEmailProvider.sendEmail.mockResolvedValue(true);
       });
 
-      it('Then should send success email with correct content', async () => {
+      it('Então deve enviar email de sucesso com conteúdo correto', async () => {
         await service.notifyVideoProcessingComplete(mockCompletedJob, mockUserSub);
 
         expect(mockAuthService.getUserEmail).toHaveBeenCalledWith(mockUserSub);
@@ -71,7 +71,7 @@ describe('EmailNotificationService', () => {
         });
       });
 
-      it('Then should include job details in email content', async () => {
+      it('Então deve incluir detalhes do job no conteúdo do email', async () => {
         await service.notifyVideoProcessingComplete(mockCompletedJob, mockUserSub);
 
         const emailCall = mockEmailProvider.sendEmail.mock.calls[0][0];
@@ -82,13 +82,13 @@ describe('EmailNotificationService', () => {
       });
     });
 
-    describe('When notifying video processing complete for failed job', () => {
+    describe('Quando notificando processamento de vídeo concluído para job falhado', () => {
       beforeEach(() => {
         mockAuthService.getUserEmail.mockResolvedValue(mockUserEmail);
         mockEmailProvider.sendEmail.mockResolvedValue(true);
       });
 
-      it('Then should send error email with correct content', async () => {
+      it('Então deve enviar email de erro com conteúdo correto', async () => {
         await service.notifyVideoProcessingComplete(mockFailedJob, mockUserSub);
 
         expect(mockAuthService.getUserEmail).toHaveBeenCalledWith(mockUserSub);
@@ -99,7 +99,7 @@ describe('EmailNotificationService', () => {
         });
       });
 
-      it('Then should include error details in email content', async () => {
+      it('Então deve incluir detalhes do erro no conteúdo do email', async () => {
         await service.notifyVideoProcessingComplete(mockFailedJob, mockUserSub);
 
         const emailCall = mockEmailProvider.sendEmail.mock.calls[0][0];
@@ -109,13 +109,13 @@ describe('EmailNotificationService', () => {
       });
     });
 
-    describe('When user email retrieval fails', () => {
-      describe('And auth service returns null', () => {
+    describe('Quando a recuperação do email do usuário falha', () => {
+      describe('E o serviço de auth retorna null', () => {
         beforeEach(() => {
           mockAuthService.getUserEmail.mockResolvedValue(null);
         });
 
-        it('Then should return early without sending email', async () => {
+        it('Então deve retornar cedo sem enviar email', async () => {
           await service.notifyVideoProcessingComplete(mockCompletedJob, mockUserSub);
 
           expect(mockAuthService.getUserEmail).toHaveBeenCalledWith(mockUserSub);
@@ -123,12 +123,12 @@ describe('EmailNotificationService', () => {
         });
       });
 
-      describe('And auth service throws error', () => {
+      describe('E o serviço de auth lança erro', () => {
         beforeEach(() => {
           mockAuthService.getUserEmail.mockRejectedValue(new Error('Auth service error'));
         });
 
-        it('Then should propagate the error', async () => {
+        it('Então deve propagar o erro', async () => {
           await expect(
             service.notifyVideoProcessingComplete(mockCompletedJob, mockUserSub),
           ).rejects.toThrow('Auth service error');
@@ -136,20 +136,20 @@ describe('EmailNotificationService', () => {
       });
     });
 
-    describe('When email sending fails', () => {
+    describe('Quando o envio de email falha', () => {
       beforeEach(() => {
         mockAuthService.getUserEmail.mockResolvedValue(mockUserEmail);
         mockEmailProvider.sendEmail.mockRejectedValue(new Error('Email service error'));
       });
 
-      it('Then should propagate the error', async () => {
+      it('Então deve propagar o erro', async () => {
         await expect(
           service.notifyVideoProcessingComplete(mockCompletedJob, mockUserSub),
         ).rejects.toThrow('Email service error');
       });
     });
 
-    describe('When job has no updatedAt date', () => {
+    describe('Quando o job não tem data updatedAt', () => {
       const jobWithoutUpdatedAt = new ProcessingJob(
         'job-789',
         'video3.mp4',
@@ -167,7 +167,7 @@ describe('EmailNotificationService', () => {
         mockEmailProvider.sendEmail.mockResolvedValue(true);
       });
 
-      it('Then should use createdAt date in email', async () => {
+      it('Então deve usar a data createdAt no email', async () => {
         await service.notifyVideoProcessingComplete(jobWithoutUpdatedAt, mockUserSub);
 
         const emailCall = mockEmailProvider.sendEmail.mock.calls[0][0];
@@ -175,7 +175,7 @@ describe('EmailNotificationService', () => {
       });
     });
 
-    describe('When job has updatedAt date', () => {
+    describe('Quando o job tem data updatedAt', () => {
       const jobWithUpdatedAt = new ProcessingJob(
         'job-999',
         'video4.mp4',
@@ -193,7 +193,7 @@ describe('EmailNotificationService', () => {
         mockEmailProvider.sendEmail.mockResolvedValue(true);
       });
 
-      it('Then should use updatedAt date in email', async () => {
+      it('Então deve usar a data updatedAt no email', async () => {
         await service.notifyVideoProcessingComplete(jobWithUpdatedAt, mockUserSub);
 
         const emailCall = mockEmailProvider.sendEmail.mock.calls[0][0];
@@ -201,7 +201,7 @@ describe('EmailNotificationService', () => {
       });
     });
 
-    describe('When handling different job statuses', () => {
+    describe('Quando lidando com diferentes status de job', () => {
       const pendingJob = ProcessingJob.createPending('job-pending', 'video-pending.mp4', 'user-123');
       const processingJob = ProcessingJob.createProcessing('job-processing', 'video-processing.mp4', 'user-456');
 
@@ -210,13 +210,13 @@ describe('EmailNotificationService', () => {
         mockEmailProvider.sendEmail.mockResolvedValue(true);
       });
 
-      it('Then should not send email for pending job', async () => {
+      it('Então não deve enviar email para job pendente', async () => {
         await service.notifyVideoProcessingComplete(pendingJob, mockUserSub);
 
         expect(mockEmailProvider.sendEmail).not.toHaveBeenCalled();
       });
 
-      it('Then should not send email for processing job', async () => {
+      it('Então não deve enviar email para job em processamento', async () => {
         await service.notifyVideoProcessingComplete(processingJob, mockUserSub);
 
         expect(mockEmailProvider.sendEmail).not.toHaveBeenCalled();

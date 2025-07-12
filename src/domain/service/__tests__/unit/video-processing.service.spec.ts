@@ -4,7 +4,7 @@ import { Video } from '../../../entities/video.entity';
 import { ProcessingJob, JobStatus } from '../../../entities/processing-job.entity';
 import { EmailNotificationService } from '../../email-notification.service';
 
-describe('VideoProcessingService', () => {
+describe('Serviço de Processamento de Vídeo', () => {
   let service: VideoProcessingService;
   let mockVideoProcessor: any;
   let mockFileStorage: any;
@@ -91,8 +91,8 @@ describe('VideoProcessingService', () => {
     jest.clearAllMocks();
   });
 
-  describe('Given VideoProcessingService', () => {
-    describe('When processing video successfully', () => {
+  describe('Dado o VideoProcessingService', () => {
+    describe('Quando processando vídeo com sucesso', () => {
       const mockFrameFiles = ['/temp/frame1.png', '/temp/frame2.png', '/temp/frame3.png'];
 
       beforeEach(() => {
@@ -106,7 +106,7 @@ describe('VideoProcessingService', () => {
         mockEmailNotificationService.notifyVideoProcessingComplete.mockResolvedValue();
       });
 
-      it('Then should process video and return completed job', async () => {
+      it('Então deve processar o vídeo e retornar job concluído', async () => {
         const result = await service.processVideo(mockVideo, 'user-456');
 
         expect(result).toEqual(mockCompletedJob);
@@ -120,7 +120,7 @@ describe('VideoProcessingService', () => {
         );
       });
 
-      it('Then should send email notification', async () => {
+      it('Então deve enviar notificação por email', async () => {
         await service.processVideo(mockVideo, 'user-456');
 
         expect(mockEmailNotificationService.notifyVideoProcessingComplete).toHaveBeenCalledWith(
@@ -130,7 +130,7 @@ describe('VideoProcessingService', () => {
       });
     });
 
-    describe('When frame extraction fails', () => {
+    describe('Quando a extração de frames falha', () => {
       const extractionError = new Error('FFmpeg not found');
 
       beforeEach(() => {
@@ -142,17 +142,17 @@ describe('VideoProcessingService', () => {
         mockEmailNotificationService.notifyVideoProcessingComplete.mockResolvedValue();
       });
 
-      it('Then should update job with failed status', async () => {
+      it('Então deve atualizar job com status falhado', async () => {
         await expect(service.processVideo(mockVideo, 'user-456')).rejects.toThrow('FFmpeg not found');
       });
 
-      it('Then should send email notification for failed job', async () => {
+      it('Então deve enviar notificação por email para job falhado', async () => {
         await expect(service.processVideo(mockVideo, 'user-456')).rejects.toThrow('FFmpeg not found');
         expect(mockEmailNotificationService.notifyVideoProcessingComplete).toHaveBeenCalled();
       });
     });
 
-    describe('When no frames are extracted', () => {
+    describe('Quando nenhum frame é extraído', () => {
       beforeEach(() => {
         mockFileStorage.fileExists.mockResolvedValue(true);
         mockFileStorage.downloadFile.mockResolvedValue();
@@ -162,7 +162,7 @@ describe('VideoProcessingService', () => {
         mockEmailNotificationService.notifyVideoProcessingComplete.mockResolvedValue();
       });
 
-      it('Then should update job with failed status', async () => {
+      it('Então deve atualizar job com status falhado', async () => {
         await expect(service.processVideo(mockVideo, 'user-456')).rejects.toThrow('Nenhum frame extraído do vídeo');
       });
     });
